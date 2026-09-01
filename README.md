@@ -1,42 +1,38 @@
-# Alang-Alang Fieldwork Hub — Global Loading Fix v3
+# Alang-Alang Map Icon Branding Patch
 
-This replaces the incomplete v2 loading fix.
-
-## Actual root cause
-The original `styles.css` had two missing closing braces near the mobile
-Household Survey navigation rules. That left an unfinished `@media`/selector block.
-
-Because of that malformed CSS, the previous appended `[hidden]` rule was not
-reliably parsed, so loading screens could remain as full-height blocks on:
-- Dashboard
-- Surveys
-- Household Survey
-- Map
-- Community Diagnosis
-- Calendar
-
-## What v3 does
-1. Repairs the malformed CSS and verifies balanced `{}` braces.
-2. Adds `[hidden] { display:none!important }` at the stylesheet level.
-3. Adds the same tiny safety rule inline in EVERY HTML page.
-4. `app-common.js` explicitly sets the loading screen to `display:none!important`.
-5. `household-survey.js` does the same for the survey loading screen.
-6. Bumps the service worker/cache to `aa-fieldwork-v3`.
-7. Bumps CSS/common JS query versions so stale offline assets are bypassed.
+The uploaded Alang-Alang municipality map is now the app/community icon.
 
 ## Replace
-Upload/replace ALL files in this ZIP except `supabase-config.js` if your live
-Supabase URL/key are already configured correctly.
+- index.html
+- dashboard.html
+- surveys.html
+- household-survey.html
+- map.html
+- diagnosis.html
+- calendar.html
+- styles.css
+- manifest.webmanifest
+- service-worker.js
+- app-common.js
+- household-survey.js
+- icon-192.png
+- icon-512.png
 
-If you keep your existing configured `supabase-config.js`, do NOT overwrite it
-with the placeholder copy from this patch.
+## Add
+- favicon-64.png
+- alang-alang-map.jpg
 
 ## No SQL
 
-## After upload
-Open the app while ONLINE once. The v3 service worker will activate and remove
-older `aa-fieldwork-*` caches. Refresh once after that.
+### Where the map icon appears
+- Login page
+- Loading screens
+- App header / brand mark
+- Browser favicon
+- PWA / Add-to-Home-Screen icon
+- Installed app icon
 
-Expected behavior:
-Opening page → short loading state → loading state disappears completely →
-actual page starts at the top. No need to scroll past a fake loading page.
+The original uploaded map is preserved as `alang-alang-map.jpg`.
+Square PWA icons are center-cropped/resized versions of the same image.
+
+Cache is bumped to `aa-fieldwork-v3` so old AA text/icon assets are replaced offline too.

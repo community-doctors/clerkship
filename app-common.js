@@ -23,18 +23,7 @@
     ctx={client,user,member,db,online,safe,community:'Alang-Alang, Leyte',signOut:async()=>{if(client)await client.auth.signOut();await db.setSetting('cached_member',null);location.replace('index.html');}};
     document.querySelectorAll('[data-user-name]').forEach(el=>el.textContent=member.display_name||user?.email||'Group member');
     document.querySelectorAll('[data-signout]').forEach(btn=>btn.addEventListener('click',ctx.signOut));
-    const loading=document.getElementById('app-loading'),shell=document.getElementById('app-shell');
-    if(loading){
-      loading.hidden=true;
-      loading.style.setProperty('display','none','important');
-      loading.setAttribute('aria-hidden','true');
-    }
-    if(shell){
-      shell.hidden=false;
-      shell.style.removeProperty('display');
-      shell.removeAttribute('aria-hidden');
-    }
-    document.body.classList.add('aa-app-ready');
+    const loading=document.getElementById('app-loading'),shell=document.getElementById('app-shell');if(loading)loading.hidden=true;if(shell)shell.hidden=false;
     return ctx;
   }
   window.AAApp={context,safe,online};
