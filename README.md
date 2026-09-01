@@ -1,21 +1,15 @@
-# Alang-Alang Fieldwork Hub — Compact UI v4
+# Alang-Alang Fieldwork Hub — Discard Draft v5
 
-## Replace
-Upload the files in this ZIP.
+Run once in Supabase:
+- `discard-draft-policy.sql`
 
-If your existing `supabase-config.js` already has the real Supabase URL/key,
-KEEP that live file and do not replace it with any placeholder copy.
+Then upload/replace the app files in this ZIP.
 
-## No SQL
+Behavior:
+- Drafts show `Discard`.
+- Completed surveys do not.
+- Unsynced drafts can be discarded offline.
+- Synced drafts require internet so the Supabase copy is removed too.
+- Synced optional photo is removed as well.
 
-## Changes
-- less explanatory text
-- shorter dashboard labels
-- smaller headings/body text
-- tighter cards/panels
-- smaller nav and status text
-- compact Household Survey UI
-- actual survey questions are NOT shortened
-- phone layout remains touch-friendly
-- offline cache bumped to `aa-fieldwork-v4`
-- `compact-ui.css` is cached for offline use
+Keep your existing live `supabase-config.js` with the real project URL/key.

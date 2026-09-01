@@ -183,3 +183,12 @@ html,body{font-size:13px}
 
 /* Keep touch targets usable even though text is compact. */
 button,a.primary,.actions a,.actions button,.mobile-bottom-nav a{touch-action:manipulation}
+
+
+/* v5 — Draft discard */
+.aa-survey-row{padding:0!important;align-items:stretch!important}
+.aa-survey-open{flex:1 1 auto;min-width:0;padding:8px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px;text-decoration:none}
+.aa-discard-draft,.aa-discard-button{border:1px solid #d9b6b3!important;background:#fff!important;color:var(--maroon)!important;font-weight:900!important}
+.aa-discard-draft{flex:0 0 auto;margin:7px 9px 7px 0;min-height:34px;padding:0 9px;border-radius:8px;font-size:8px;cursor:pointer}
+.aa-discard-draft:hover,.aa-discard-button:hover{background:#faeeee!important}
+@media(max-width:520px){.aa-survey-open{padding:8px 9px}.aa-discard-draft{min-width:64px;padding:0 7px}}

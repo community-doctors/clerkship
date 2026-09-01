@@ -274,6 +274,47 @@
     await saveLocal();
   }
 
+  async function discardCurrentDraft() {
+    const record = currentRecord || await db.getSubmission(localId);
+    if (!record) { location.replace("surveys.html"); return; }
+    if (record.form_status === "completed") {
+      alert("Completed surveys cannot be discarded here.");
+      return;
+    }
+
+    const label = record.household_number || "this draft";
+    if (!confirm(`Discard ${label}? This cannot be undone.`)) return;
+
+    clearTimeout(saveTimer);
+
+    if (record.server_id) {
+      if (!navigator.onLine || !client) {
+        alert("This draft was already synced. Reconnect before discarding it everywhere.");
+        return;
+      }
+
+      if (record.photo_path) {
+        const { error: photoError } = await client.storage
+          .from("aa-field-media").remove([record.photo_path]);
+        if (photoError) {
+          alert(`Could not remove the synced photo: ${photoError.message}`);
+          return;
+        }
+      }
+
+      const { error: serverError } = await client
+        .from("aa_household_submissions").delete().eq("id", record.server_id);
+      if (serverError) {
+        alert(`Could not delete the synced draft: ${serverError.message}`);
+        return;
+      }
+    }
+
+    await db.deleteMedia(`${localId}:household_photo`).catch(() => {});
+    await db.deleteSubmission(localId);
+    location.replace("surveys.html");
+  }
+
   async function syncAllLocal() {
     if (!navigator.onLine || !appCtx?.client) { updateSaveUI("Saved offline", "pending", "No internet connection. Sync will be retried later."); return; }
     updateSaveUI("Syncing…", "pending", "Uploading queued household surveys.");
@@ -471,6 +512,8 @@
     document.getElementById("household-photo-input").addEventListener("change", e => savePhoto(e.target.files?.[0]));
     document.getElementById("remove-photo-btn").addEventListener("click", removePhoto);
 
+    document.getElementById("discard-draft-btn")?.addEventListener("click", discardCurrentDraft);
+
     document.getElementById("save-draft-btn").addEventListener("click", async () => {
       await saveLocal("draft");
       updateSaveUI("Draft saved locally", "pending");
@@ -509,7 +552,7 @@
     try {
       updateNetworkUI();
       if ("serviceWorker" in navigator) {
-        navigator.serviceWorker.register("./service-worker.js?v=3").catch(console.warn);
+        navigator.serviceWorker.register("./service-worker.js?v=1").catch(console.warn);
       }
 
       await db.openDB();
@@ -522,7 +565,11 @@
       updateSectionNavigator();
 
       loading.hidden = true;
+      loading.style.setProperty("display","none","important");
+      loading.setAttribute("aria-hidden","true");
       app.hidden = false;
+      app.style.removeProperty("display");
+      document.body.classList.add("aa-app-ready");
       document.body.classList.remove("portal-is-loading");
 
       if (new URLSearchParams(location.search).get("sync_all") === "1" && navigator.onLine) {
