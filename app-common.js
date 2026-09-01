@@ -9,7 +9,7 @@
     if(ctx)return ctx;
     await db.openDB(); setNetwork();
     window.addEventListener('online',setNetwork);window.addEventListener('offline',setNetwork);
-    if('serviceWorker'in navigator)navigator.serviceWorker.register('./service-worker.js?v=2').catch(console.warn);
+    if('serviceWorker'in navigator)navigator.serviceWorker.register('./service-worker.js?v=3').catch(console.warn);
     if(configReady()&&window.supabase?.createClient){client=window.supabase.createClient(cfg.SUPABASE_URL,cfg.SUPABASE_ANON_KEY);}
     let user=null,member=null;
     if(client){const {data}=await client.auth.getSession();user=data?.session?.user||null;}
@@ -23,7 +23,18 @@
     ctx={client,user,member,db,online,safe,community:'Alang-Alang, Leyte',signOut:async()=>{if(client)await client.auth.signOut();await db.setSetting('cached_member',null);location.replace('index.html');}};
     document.querySelectorAll('[data-user-name]').forEach(el=>el.textContent=member.display_name||user?.email||'Group member');
     document.querySelectorAll('[data-signout]').forEach(btn=>btn.addEventListener('click',ctx.signOut));
-    const loading=document.getElementById('app-loading'),shell=document.getElementById('app-shell');if(loading)loading.hidden=true;if(shell)shell.hidden=false;
+    const loading=document.getElementById('app-loading'),shell=document.getElementById('app-shell');
+    if(loading){
+      loading.hidden=true;
+      loading.style.setProperty('display','none','important');
+      loading.setAttribute('aria-hidden','true');
+    }
+    if(shell){
+      shell.hidden=false;
+      shell.style.removeProperty('display');
+      shell.removeAttribute('aria-hidden');
+    }
+    document.body.classList.add('aa-app-ready');
     return ctx;
   }
   window.AAApp={context,safe,online};
