@@ -1,0 +1,540 @@
+(() => {
+  const FORM_CODE = "SHS-HH-2023";
+  const FORM_VERSION = "2023.1";
+  const cfg = window.APP_CONFIG || {};
+  const db = window.AAOfflineDB;
+  const form = document.getElementById("household-form");
+  const loading = document.getElementById("household-loading");
+  const app = document.getElementById("household-app");
+
+  let client = null;
+  let user = null;
+  let profile = null;
+  let rotation = { community_id: null, communities: { name: "Alang-Alang", province: "Leyte" }, course_code: "Community Fieldwork", rotation_type: "Group", batch: "" };
+  let appCtx = null;
+  let localId = new URLSearchParams(location.search).get("local_id") || crypto.randomUUID();
+  let currentRecord = null;
+  let photoObjectUrl = null;
+  let saveTimer = null;
+
+  const repeaters = [
+    "family_members","breastfeeding","supplementary_feeding","nutrition_children",
+    "immunization_children","illnesses","deaths","philhealth_members","covid_vaccines",
+    "community_leaders","problems"
+  ];
+
+  const safe = (v = "") => String(v)
+    .replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;").replaceAll("'","&#039;");
+
+  function updateNetworkUI() {
+    const online = navigator.onLine;
+    document.getElementById("household-network-dot").classList.toggle("online", online);
+    document.getElementById("household-network-text").textContent = online ? "Online" : "Offline";
+  }
+
+  async function getAuthContext() {
+    appCtx = await AAApp.context({allowOffline:true});
+    client = appCtx.client; user = appCtx.user; profile = { full_name: appCtx.member.display_name, email: user?.email || "", status: "active", role: appCtx.member.role };
+    rotation = { community_id: null, communities: { name: "Alang-Alang", province: "Leyte" }, course_code: "Community Fieldwork", rotation_type: "Group", batch: "" };
+  }
+
+  function setupDecisionMatrix() {
+    const target = document.getElementById("decision_matrix");
+    const areas = ["Family Expenses","Health","Education","Participation in Community Activities"];
+    const people = ["Father","Mother","Children","Single","Others"];
+    target.innerHTML = areas.map((area, i) => `
+      <tr>
+        <th>${area}</th>
+        ${people.map(p => `<td><input type="checkbox" name="decision_${i}" value="${p}"></td>`).join("")}
+      </tr>
+    `).join("");
+  }
+
+  function createRepeaterRow(type, data = {}) {
+    const template = document.getElementById(`${type}_template`);
+    const row = template.content.firstElementChild.cloneNode(true);
+    row.dataset.repeaterType = type;
+    row.querySelectorAll("[data-field]").forEach(el => {
+      const key = el.dataset.field;
+      if (data[key] !== undefined && data[key] !== null) el.value = data[key];
+      el.addEventListener("input", scheduleSave);
+      el.addEventListener("change", scheduleSave);
+    });
+    row.querySelector(".remove-row")?.addEventListener("click", () => {
+      row.remove();
+      scheduleSave();
+    });
+    document.getElementById(`${type}_rows`).appendChild(row);
+  }
+
+  function ensureStarterRows() {
+    const minimums = {
+      family_members: 1, breastfeeding: 1, supplementary_feeding: 1,
+      nutrition_children: 1, immunization_children: 1, illnesses: 1,
+      deaths: 1, philhealth_members: 1, covid_vaccines: 1,
+      community_leaders: 1, problems: 3
+    };
+    for (const [type, count] of Object.entries(minimums)) {
+      const target = document.getElementById(`${type}_rows`);
+      if (!target.children.length) {
+        for (let i = 0; i < count; i++) createRepeaterRow(type);
+      }
+    }
+  }
+
+  function collectRepeater(type) {
+    return [...document.querySelectorAll(`#${type}_rows [data-repeater-type="${type}"]`)].map(row => {
+      const obj = {};
+      row.querySelectorAll("[data-field]").forEach(el => obj[el.dataset.field] = el.value);
+      return obj;
+    }).filter(obj => Object.values(obj).some(v => String(v || "").trim() !== ""));
+  }
+
+  function restoreRepeater(type, rows = []) {
+    const target = document.getElementById(`${type}_rows`);
+    target.innerHTML = "";
+    rows.forEach(row => createRepeaterRow(type, row));
+  }
+
+  function collectFormData() {
+    const data = {};
+    const fd = new FormData(form);
+
+    for (const [key, value] of fd.entries()) {
+      if (data[key] === undefined) data[key] = value;
+      else if (Array.isArray(data[key])) data[key].push(value);
+      else data[key] = [data[key], value];
+    }
+
+    // Ensure checkbox groups that are empty are still represented predictably.
+    const checkboxNames = [
+      "livelihood","property_owned","appliances","transport","utilities","food_storage",
+      "garbage_disposal","animal_management","delay_decision","delay_reaching","delay_receiving",
+      "decision_0","decision_1","decision_2","decision_3"
+    ];
+    checkboxNames.forEach(name => {
+      const checked = [...form.querySelectorAll(`input[type="checkbox"][name="${name}"]:checked`)].map(x => x.value);
+      data[name] = checked;
+    });
+
+    repeaters.forEach(type => data[type] = collectRepeater(type));
+    return data;
+  }
+
+  function restoreFormData(data = {}) {
+    Object.entries(data).forEach(([name, value]) => {
+      if (repeaters.includes(name)) return;
+      const elements = [...form.querySelectorAll(`[name="${CSS.escape(name)}"]`)];
+      if (!elements.length) return;
+
+      if (elements[0].type === "checkbox") {
+        const values = Array.isArray(value) ? value : [value];
+        elements.forEach(el => el.checked = values.includes(el.value));
+      } else if (elements[0].type === "radio") {
+        elements.forEach(el => el.checked = el.value === value);
+      } else {
+        elements[0].value = value ?? "";
+      }
+    });
+
+    repeaters.forEach(type => restoreRepeater(type, data[type] || []));
+    ensureStarterRows();
+  }
+
+  function currentGps() {
+    return currentRecord?.gps || null;
+  }
+
+  async function saveLocal(statusOverride = null) {
+    const now = new Date().toISOString();
+    const responses = collectFormData();
+    const photo = await db.getMedia(`${localId}:household_photo`);
+
+    const record = {
+      ...(currentRecord || {}),
+      local_uuid: localId,
+      form_code: FORM_CODE,
+      form_version: FORM_VERSION,
+      form_status: statusOverride || currentRecord?.form_status || "draft",
+      sync_status: "pending",
+      server_id: currentRecord?.server_id || null,
+      user_id: user?.id || currentRecord?.user_id || null,
+      community_id: null,
+      community_name: "Alang-Alang",
+      household_number: responses.household_number || "",
+      interview_date: responses.interview_date || "",
+      barangay: responses.barangay || "",
+      zone: responses.zone || "",
+      interviewer: responses.interviewer || "",
+      responses,
+      gps: currentRecord?.gps || null,
+      has_location: !!currentRecord?.gps?.latitude,
+      has_photo: !!photo?.blob,
+      created_at: currentRecord?.created_at || now,
+      updated_at: now,
+      last_error: null
+    };
+
+    currentRecord = record;
+    await db.putSubmission(record);
+    updateSaveUI("Saved locally", "pending");
+    return record;
+  }
+
+  function scheduleSave() {
+    clearTimeout(saveTimer);
+    document.getElementById("autosave-status").textContent = "Saving…";
+    updateSectionNavigator();
+    saveTimer = setTimeout(() => saveLocal().catch(console.error), 450);
+  }
+
+  function updateSaveUI(text, state = "pending", detail = "") {
+    document.getElementById("autosave-status").textContent = text;
+    document.getElementById("bottom-save-status").textContent = text;
+    document.getElementById("bottom-sync-detail").textContent = detail || (
+      state === "synced" ? "Latest changes are synchronized to the Toolkit." :
+      state === "error" ? "The draft remains safely stored on this device." :
+      "This draft remains available on this device until synchronization succeeds."
+    );
+    const chip = document.getElementById("survey-sync-chip");
+    chip.textContent = state === "synced" ? "Synced ✓" : state === "error" ? "Sync error" : "Saved locally";
+    chip.className = `survey-sync-chip is-${state}`;
+  }
+
+  function updateGpsUI() {
+    const gps = currentGps();
+    const target = document.getElementById("gps-readout");
+    if (!gps?.latitude) {
+      target.textContent = "No location captured.";
+      return;
+    }
+    target.innerHTML = `
+      <strong>Location captured ✓</strong>
+      <span>${Number(gps.latitude).toFixed(6)}, ${Number(gps.longitude).toFixed(6)}</span>
+      <small>Accuracy: ${gps.accuracy ? `±${Math.round(gps.accuracy)} m` : "not reported"} · ${gps.captured_at ? new Date(gps.captured_at).toLocaleString() : ""}</small>
+    `;
+  }
+
+  async function captureLocation() {
+    if (!navigator.geolocation) { alert("Geolocation is not supported on this device/browser."); return; }
+    const btn=document.getElementById("capture-location-btn"); btn.disabled=true; btn.textContent="Searching for GPS…";
+    const readout=document.getElementById("gps-readout");
+    let best=null, watchId=null, finished=false; const started=Date.now();
+    const finish=async(message=null)=>{if(finished)return;finished=true;if(watchId!==null)navigator.geolocation.clearWatch(watchId);btn.disabled=false;btn.textContent=best?"📍 Retake GPS Location":"📍 Capture GPS Location";if(best){currentRecord=currentRecord||{};currentRecord.gps={latitude:best.coords.latitude,longitude:best.coords.longitude,accuracy:best.coords.accuracy,altitude:best.coords.altitude,captured_at:new Date().toISOString(),source:"device"};updateGpsUI();await saveLocal();}else if(message){readout.innerHTML=`<strong>GPS not acquired</strong><small>${safe(message)} Keep device Location ON and try outdoors/near a window, or use manual coordinates.</small>`;}};
+    watchId=navigator.geolocation.watchPosition(pos=>{if(!best||pos.coords.accuracy<best.coords.accuracy)best=pos;readout.innerHTML=`<strong>Searching for best GPS fix…</strong><span>${Number(pos.coords.latitude).toFixed(6)}, ${Number(pos.coords.longitude).toFixed(6)}</span><small>Current accuracy: ±${Math.round(pos.coords.accuracy)} m · ${Math.round((Date.now()-started)/1000)} s</small>`;if(pos.coords.accuracy<=25)finish();},err=>{if(err.code===1)finish("Location permission was denied.");}, {enableHighAccuracy:true,maximumAge:300000,timeout:60000});
+    setTimeout(()=>finish(best?null:"No satellite/network location fix within 65 seconds."),65000);
+  }
+
+  async function saveManualGps(){const lat=Number(document.getElementById("manual-latitude")?.value),lon=Number(document.getElementById("manual-longitude")?.value);if(!Number.isFinite(lat)||!Number.isFinite(lon)||lat<-90||lat>90||lon<-180||lon>180){alert("Enter valid latitude and longitude.");return;}currentRecord=currentRecord||{};currentRecord.gps={latitude:lat,longitude:lon,accuracy:null,altitude:null,captured_at:new Date().toISOString(),source:"manual"};updateGpsUI();await saveLocal();}
+
+  async function savePhoto(file) {
+    if (!file) return;
+    if (file.size > 8 * 1024 * 1024) {
+      alert("Please use a photo under 8 MB.");
+      return;
+    }
+    await db.putMedia({
+      local_media_id: `${localId}:household_photo`,
+      local_uuid: localId,
+      media_type: "household_reference",
+      file_name: file.name || "household-reference.jpg",
+      content_type: file.type || "image/jpeg",
+      blob: file,
+      updated_at: new Date().toISOString()
+    });
+    await renderPhoto();
+    updateSectionNavigator();
+    await saveLocal();
+  }
+
+  async function renderPhoto() {
+    const media = await db.getMedia(`${localId}:household_photo`);
+    const preview = document.getElementById("household-photo-preview");
+    const remove = document.getElementById("remove-photo-btn");
+
+    if (photoObjectUrl) URL.revokeObjectURL(photoObjectUrl);
+    photoObjectUrl = null;
+
+    if (!media?.blob) {
+      preview.innerHTML = "No photo saved.";
+      remove.hidden = true;
+      return;
+    }
+
+    photoObjectUrl = URL.createObjectURL(media.blob);
+    preview.innerHTML = `<img src="${photoObjectUrl}" alt="Saved household reference photo"><small>${safe(media.file_name || "Household reference photo")}</small>`;
+    remove.hidden = false;
+  }
+
+  async function removePhoto() {
+    await db.deleteMedia(`${localId}:household_photo`);
+    await renderPhoto();
+    updateSectionNavigator();
+    await saveLocal();
+  }
+
+  async function syncAllLocal() {
+    if (!navigator.onLine || !appCtx?.client) { updateSaveUI("Saved offline", "pending", "No internet connection. Sync will be retried later."); return; }
+    updateSaveUI("Syncing…", "pending", "Uploading queued household surveys.");
+    const result=await AASurveySync.syncAll(appCtx);
+    const refreshed=await db.getSubmission(localId); if(refreshed)currentRecord=refreshed;
+    if(result.errors)updateSaveUI("Saved locally", "error", `${result.errors} record(s) could not sync yet. Nothing was deleted from this device.`); else updateSaveUI("Synced ✓", "synced");
+  }
+
+  async function loadRecord() {
+    currentRecord = await db.getSubmission(localId);
+    if (!currentRecord) {
+      currentRecord = {
+        local_uuid: localId,
+        form_code: FORM_CODE,
+        form_version: FORM_VERSION,
+        form_status: "draft",
+        sync_status: "pending",
+        user_id: user?.id || null,
+        community_id: null,
+        community_name: "Alang-Alang",
+        responses: {
+          interview_date: new Date().toISOString().slice(0,10),
+          interviewer: profile?.full_name || profile?.email || ""
+        },
+        gps: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      await db.putSubmission(currentRecord);
+    }
+
+    restoreFormData(currentRecord.responses || {});
+    updateGpsUI();
+    await renderPhoto();
+    document.getElementById("local-record-code").textContent = localId.slice(0,8).toUpperCase();
+
+    if (rotation?.communities?.name) {
+      document.getElementById("assigned-community-name").textContent =
+        `Alang-Alang, Leyte`;
+      document.getElementById("assigned-rotation-meta").textContent =
+        [rotation.course_code, rotation.rotation_type, rotation.batch].filter(Boolean).join(" · ");
+    } else if (currentRecord.community_name) {
+      document.getElementById("assigned-community-name").textContent = currentRecord.community_name;
+    } else {
+      document.getElementById("assigned-community-name").textContent = "No active rotation cached";
+    }
+
+    updateSaveUI(
+      currentRecord.sync_status === "synced" ? "Synced ✓" : currentRecord.sync_status === "error" ? "Saved locally" : "Saved locally",
+      currentRecord.sync_status || "pending",
+      currentRecord.last_error || ""
+    );
+  }
+
+
+  const surveySectionOrder = [
+    "cover",
+    "family",
+    "socioeconomic",
+    "health",
+    "environment",
+    "participation",
+    "resources"
+  ];
+
+  function meaningfulValue(el) {
+    if (!el || el.disabled) return false;
+    if (el.type === "checkbox" || el.type === "radio") return el.checked;
+    if (el.type === "file") return !!el.files?.length;
+    return String(el.value ?? "").trim() !== "";
+  }
+
+  function sectionHasData(sectionId) {
+    const section = document.querySelector(`[data-section="${sectionId}"]`);
+    if (!section) return false;
+
+    // Any ordinary field with a meaningful value counts as "started".
+    if ([...section.querySelectorAll("input,select,textarea")]
+      .filter(el => !el.closest("template"))
+      .some(meaningfulValue)) return true;
+
+    // GPS/photo are digital fieldwork additions and also count as activity.
+    if (sectionId === "cover") {
+      if (currentRecord?.gps?.latitude) return true;
+      const preview = document.getElementById("household-photo-preview");
+      if (preview?.querySelector("img")) return true;
+    }
+
+    return false;
+  }
+
+  function updateSectionNavigator() {
+    const started = surveySectionOrder.filter(sectionHasData).length;
+    const percent = Math.round((started / surveySectionOrder.length) * 100);
+
+    const label = document.getElementById("survey-progress-label");
+    const bar = document.getElementById("survey-progress-bar");
+    if (label) label.textContent = `${started} of ${surveySectionOrder.length} sections started`;
+    if (bar) bar.style.width = `${percent}%`;
+
+    document.querySelectorAll("[data-jump-section]").forEach(button => {
+      const id = button.dataset.jumpSection;
+      button.classList.toggle("has-data", sectionHasData(id));
+    });
+  }
+
+  function setActiveSurveySection(sectionId) {
+    document.querySelectorAll("[data-jump-section]").forEach(button => {
+      const active = button.dataset.jumpSection === sectionId;
+      button.classList.toggle("active", active);
+      if (active) {
+        button.setAttribute("aria-current", "step");
+        // On narrow screens, keep the active tab visible.
+        button.scrollIntoView({ block: "nearest", inline: "center", behavior: "smooth" });
+      } else {
+        button.removeAttribute("aria-current");
+      }
+    });
+  }
+
+  function jumpToSurveySection(sectionId) {
+    const section = document.querySelector(`[data-section="${sectionId}"]`);
+    if (!section) return;
+
+    if (section.tagName === "DETAILS") section.open = true;
+    setActiveSurveySection(sectionId);
+
+    const nav = document.getElementById("survey-section-nav");
+    const topOffset = (document.querySelector(".portal-topbar")?.offsetHeight || 0)
+      + (nav?.offsetHeight || 0)
+      + 18;
+
+    const y = section.getBoundingClientRect().top + window.scrollY - topOffset;
+    window.scrollTo({ top: Math.max(0, y), behavior: "smooth" });
+  }
+
+  function setupSectionNavigator() {
+    document.querySelectorAll("[data-jump-section]").forEach(button => {
+      button.addEventListener("click", () => jumpToSurveySection(button.dataset.jumpSection));
+    });
+
+    const sections = surveySectionOrder
+      .map(id => document.querySelector(`[data-section="${id}"]`))
+      .filter(Boolean);
+
+    // IntersectionObserver keeps the sticky navigator aligned with scroll position.
+    if ("IntersectionObserver" in window) {
+      const observer = new IntersectionObserver(entries => {
+        const visible = entries
+          .filter(entry => entry.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
+
+        if (visible[0]) {
+          setActiveSurveySection(visible[0].target.dataset.section);
+        }
+      }, {
+        root: null,
+        rootMargin: "-28% 0px -58% 0px",
+        threshold: [0, 0.01, 0.1, 0.25]
+      });
+
+      sections.forEach(section => observer.observe(section));
+    } else {
+      const onScroll = () => {
+        const anchor = window.scrollY + 220;
+        let active = sections[0]?.dataset.section || "cover";
+        sections.forEach(section => {
+          if (section.offsetTop <= anchor) active = section.dataset.section;
+        });
+        setActiveSurveySection(active);
+      };
+      window.addEventListener("scroll", onScroll, { passive: true });
+    }
+
+    updateSectionNavigator();
+  }
+
+  function attachEvents() {
+    form.querySelectorAll("input,select,textarea").forEach(el => {
+      if (el.closest("template")) return;
+      el.addEventListener("input", scheduleSave);
+      el.addEventListener("change", scheduleSave);
+    });
+
+    document.querySelectorAll(".add-row").forEach(btn => {
+      btn.addEventListener("click", () => {
+        createRepeaterRow(btn.dataset.repeater);
+        scheduleSave();
+      });
+    });
+
+    document.getElementById("capture-location-btn").addEventListener("click", captureLocation);
+    document.getElementById("save-manual-gps")?.addEventListener("click", saveManualGps);
+    document.getElementById("take-photo-btn").addEventListener("click", () => document.getElementById("household-photo-input").click());
+    document.getElementById("household-photo-input").addEventListener("change", e => savePhoto(e.target.files?.[0]));
+    document.getElementById("remove-photo-btn").addEventListener("click", removePhoto);
+
+    document.getElementById("save-draft-btn").addEventListener("click", async () => {
+      await saveLocal("draft");
+      updateSaveUI("Draft saved locally", "pending");
+    });
+
+    document.getElementById("complete-queue-btn").addEventListener("click", async () => {
+      const hh = form.elements.household_number.value.trim();
+      const barangay = form.elements.barangay.value.trim();
+      const interviewDate = form.elements.interview_date.value;
+      if (!hh || !barangay || !interviewDate) {
+        alert("Before marking complete, enter at least Household #, Date of Interview, and Barangay.");
+        return;
+      }
+      await saveLocal("completed");
+      updateSaveUI("Completed · waiting to sync", "pending");
+      if (navigator.onLine) await syncAllLocal();
+    });
+
+    document.getElementById("sync-now-btn").addEventListener("click", async () => {
+      await saveLocal();
+      await syncAllLocal();
+    });
+
+    window.addEventListener("online", async () => {
+      updateNetworkUI();
+      try { await syncAllLocal(); } catch (err) { console.warn(err); }
+    });
+    window.addEventListener("offline", updateNetworkUI);
+
+    window.addEventListener("beforeunload", () => {
+      clearTimeout(saveTimer);
+    });
+  }
+
+  async function init() {
+    try {
+      updateNetworkUI();
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("./service-worker.js?v=1").catch(console.warn);
+      }
+
+      await db.openDB();
+      setupDecisionMatrix();
+      await getAuthContext();
+      await loadRecord();
+      ensureStarterRows();
+      attachEvents();
+      setupSectionNavigator();
+      updateSectionNavigator();
+
+      loading.hidden = true;
+      app.hidden = false;
+      document.body.classList.remove("portal-is-loading");
+
+      if (new URLSearchParams(location.search).get("sync_all") === "1" && navigator.onLine) {
+        await syncAllLocal();
+      }
+    } catch (err) {
+      console.error("[Household Survey]", err);
+      if (!loading.innerHTML.includes("Offline session")) {
+        loading.innerHTML = `<strong>Unable to open household survey</strong><span>${safe(err.message || err)}</span><a href="surveys.html">Return to Surveys</a>`;
+      }
+    }
+  }
+
+  init();
+})();

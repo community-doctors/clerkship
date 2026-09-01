@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#7b1113">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Field Map | Alang-Alang Fieldwork Hub</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="styles.css?v=1">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+</head>
+<body class="app-body" data-page="map">
+  <div id="app-loading" class="app-loading"><div class="brand-mark">AA</div><strong>Opening Field Map…</strong><span>Preparing your group workspace.</span></div>
+  <div id="app-shell" hidden>
+    <header class="app-topbar">
+      <a href="dashboard.html" class="app-brand"><span class="brand-mark small">AA</span><span><strong>Alang-Alang Fieldwork Hub</strong><small>UPM-SHS · Group Community Diagnosis</small></span></a>
+      <div class="app-user"><span class="network-chip" data-network-chip>Checking…</span><span class="user-pill" data-user-name>Group member</span><button type="button" data-signout>Sign out</button></div>
+    </header>
+    <aside class="desktop-nav"><a href="dashboard.html" class=""><span>Home</span></a><a href="surveys.html" class=""><span>Surveys</span></a><a href="map.html" class="active"><span>Map</span></a><a href="diagnosis.html" class=""><span>Diagnosis</span></a><a href="calendar.html" class=""><span>Calendar</span></a></aside>
+    <main class="app-main"><section class="page-head"><span class="eyebrow">Geospatial view</span><h1>Field Map</h1><p>Synced household GPS pins plus group-added community points. Household popups intentionally exclude names and detailed health answers.</p></section><section class="map-layout"><div class="panel map-panel"><div class="map-toolbar"><span id="map-status" class="pill">Loading…</span><select id="barangay-filter"><option value="">All barangays</option></select><button id="fit-map">Fit pins</button></div><div id="field-map"></div><small class="map-note">Base map tiles require internet unless already cached by the browser. Captured GPS coordinates remain available in survey records offline.</small></div><aside class="panel poi-panel"><div class="panel-head"><div><span class="eyebrow">Community points</span><h2>Add map point</h2></div></div><form id="poi-form" class="stack-form"><label>Name<input id="poi-name" required placeholder="e.g. Barangay Health Station"></label><label>Type<select id="poi-type"><option>Health facility</option><option>Water source</option><option>School</option><option>Meeting place</option><option>Risk area</option><option>Other</option></select></label><div class="two-cols"><label>Latitude<input id="poi-lat" inputmode="decimal" required></label><label>Longitude<input id="poi-lon" inputmode="decimal" required></label></div><label>Notes<textarea id="poi-notes" rows="3"></textarea></label><button class="primary" type="submit">Add point</button></form><div id="poi-list" class="mini-list"></div></aside></section></main>
+    <nav class="mobile-bottom-nav"><a href="dashboard.html" class=""><span>Home</span></a><a href="surveys.html" class=""><span>Surveys</span></a><a href="map.html" class="active"><span>Map</span></a><a href="diagnosis.html" class=""><span>Diagnosis</span></a><a href="calendar.html" class=""><span>Calendar</span></a></nav>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script>
+  <script src="offline-db.js?v=1"></script>
+  <script src="app-common.js?v=1"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script src="map.js?v=1"></script>
+</body>
+</html>
