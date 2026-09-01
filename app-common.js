@@ -9,7 +9,7 @@
     if(ctx)return ctx;
     await db.openDB(); setNetwork();
     window.addEventListener('online',setNetwork);window.addEventListener('offline',setNetwork);
-    if('serviceWorker'in navigator)navigator.serviceWorker.register('./service-worker.js?v=1').catch(console.warn);
+    if('serviceWorker'in navigator)navigator.serviceWorker.register('./service-worker.js?v=2').catch(console.warn);
     if(configReady()&&window.supabase?.createClient){client=window.supabase.createClient(cfg.SUPABASE_URL,cfg.SUPABASE_ANON_KEY);}
     let user=null,member=null;
     if(client){const {data}=await client.auth.getSession();user=data?.session?.user||null;}

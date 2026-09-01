@@ -509,7 +509,7 @@
     try {
       updateNetworkUI();
       if ("serviceWorker" in navigator) {
-        navigator.serviceWorker.register("./service-worker.js?v=1").catch(console.warn);
+        navigator.serviceWorker.register("./service-worker.js?v=2").catch(console.warn);
       }
 
       await db.openDB();

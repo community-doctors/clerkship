@@ -1140,3 +1140,12 @@
 @media(max-width:1100px){.quick-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.stats-grid,.indicator-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.map-layout,.calendar-layout{grid-template-columns:1fr}.map-panel #field-map{height:58vh;min-height:420px}}
 @media(max-width:760px){.app-topbar{height:60px;padding:7px 10px}.app-brand small{display:none}.app-brand strong{font-size:13px}.app-user .user-pill{display:none}.desktop-nav{display:none}.app-main{margin-left:0;padding:82px 11px 86px}.mobile-bottom-nav{position:fixed;left:0;right:0;bottom:0;z-index:120;height:66px;padding:5px max(5px,env(safe-area-inset-right)) calc(5px + env(safe-area-inset-bottom)) max(5px,env(safe-area-inset-left));background:rgba(255,253,248,.98);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(5,1fr);gap:2px}.mobile-bottom-nav a{display:grid;place-items:center;text-decoration:none;border-radius:8px;font-size:9px;font-weight:800;color:#655e57}.mobile-bottom-nav a.active{background:#f4e8e4;color:var(--maroon)}.quick-grid{grid-template-columns:1fr}.quick-card{min-height:90px}.stats-grid,.indicator-grid{grid-template-columns:1fr 1fr}.page-head h1,.hero h1{font-size:38px}.notes-grid{grid-template-columns:1fr}.priority-card{grid-template-columns:1fr}.calendar-layout{grid-template-columns:1fr}.day{min-height:55px;padding:5px}.day small{display:none}.map-layout{grid-template-columns:1fr}.poi-panel{order:2}.two-cols{grid-template-columns:1fr}.survey-topbar{grid-template-columns:auto 1fr}.survey-topbar .survey-sync-chip{grid-column:1/-1;justify-self:start}.manual-gps>div{grid-template-columns:1fr}.household-main{width:min(100% - 16px,1380px)!important}.survey-section-nav{top:0!important}.household-form-actions{padding-bottom:80px!important}}
 @media(max-width:430px){.stats-grid,.indicator-grid{grid-template-columns:1fr}.app-user button{font-size:9px}.network-chip{display:none}.mobile-bottom-nav a span{font-size:8px}.score-grid{grid-template-columns:1fr 1fr}}
+
+
+/* ============================================================
+   v2 — LOADING / HIDDEN STATE FIX
+   Author CSS must not override the HTML hidden attribute.
+   ============================================================ */
+[hidden] {
+  display: none !important;
+}
