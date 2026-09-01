@@ -1,0 +1,185 @@
+/* ============================================================
+   Alang-Alang Fieldwork Hub — Compact UI v1
+   Less copy, smaller type, tighter spacing.
+   Tap targets remain usable.
+   ============================================================ */
+
+html,body{font-size:13px}
+
+.app-topbar{height:64px;padding:8px 14px}
+.app-brand strong{font-size:13px}
+.app-brand small{font-size:7px}
+.brand-mark.small{width:36px;height:36px;border-radius:10px;font-size:13px}
+.desktop-nav{top:64px;width:185px;padding:13px 9px}
+.desktop-nav a{min-height:38px;padding:8px 10px;font-size:10px}
+.app-main{margin-left:185px;padding:84px 22px 58px}
+
+.hero,.page-head{margin-bottom:13px;max-width:760px}
+.login-card h1,.page-head h1,.hero h1{
+  margin:5px 0;
+  font-size:clamp(28px,4.6vw,42px);
+  line-height:1;
+}
+.login-card p,.page-head p,.hero p{
+  margin:5px 0;
+  font-size:12px;
+  line-height:1.4;
+}
+.eyebrow{font-size:7px;letter-spacing:.1em}
+
+.quick-grid{gap:8px;margin-bottom:10px}
+.quick-card{
+  min-height:104px;
+  padding:12px;
+  border-radius:14px;
+  gap:4px;
+}
+.quick-card>span{font-size:19px}
+.quick-card strong{font-size:13px}
+.quick-card small{font-size:8.5px;line-height:1.25}
+
+.stats-grid,.indicator-grid{gap:8px;margin-bottom:10px}
+.stats-grid article,.indicator-grid article{padding:11px;border-radius:13px}
+.stats-grid span,.indicator-grid span{font-size:7px}
+.stats-grid strong,.indicator-grid strong{margin:3px 0;font-size:22px}
+.stats-grid small,.indicator-grid small{font-size:8px}
+
+.panel{margin-bottom:10px;border-radius:14px}
+.panel-head{min-height:58px;padding:10px 13px}
+.panel-head h2{font-size:18px}
+.panel-head a{font-size:8px}
+.list-row{min-height:52px;padding:8px 12px}
+.list-row strong{font-size:11px}
+.list-row small{font-size:8px}
+.empty,.cache-note,.table-empty,.table-loading{padding:13px;font-size:10px}
+
+.button,.primary,.login-card button,.actions button,.actions a{
+  min-height:40px;
+  font-size:10px;
+}
+.mini-action{font-size:8px}
+.network-chip,.pill,.user-pill{font-size:8px;padding:5px 7px}
+
+.login-card{width:min(100%,420px);padding:23px;border-radius:18px}
+.brand-mark.large{width:62px;height:62px;border-radius:17px;font-size:21px}
+.login-card label,.stack-form label{font-size:9px}
+.login-card input,.stack-form input,.stack-form select,.stack-form textarea,
+.page-head input,.page-head select{
+  min-height:40px;
+  padding:8px 9px;
+  font-size:12px;
+}
+.privacy-note{margin-top:10px;font-size:9px}
+
+.map-layout,.calendar-layout{gap:9px}
+.map-panel{padding:9px}
+.map-toolbar{margin-bottom:6px}
+.map-toolbar select,.map-toolbar button{min-height:34px;font-size:9px}
+#field-map{height:calc(100dvh - 175px);min-height:440px}
+.map-note{font-size:8.5px}
+
+.notes-grid{gap:8px;padding:10px}
+.notes-grid label{font-size:8px}
+.notes-grid textarea{font-size:11px}
+.priority-list{padding:8px 11px 11px;gap:7px}
+.priority-card{padding:10px;border-radius:10px}
+.priority-card strong{font-size:13px}
+.priority-card p{font-size:9px}
+.score-grid span{font-size:7px;padding:6px}
+.score-grid b{font-size:13px}
+
+.calendar-head{padding:10px}
+.calendar-head strong{font-size:15px}
+.weekdays,.calendar-grid{gap:3px;padding-left:8px;padding-right:8px}
+.day{min-height:62px;padding:5px}
+.day small{font-size:6.5px}
+
+.survey-topbar{min-height:54px;padding:6px 11px}
+.survey-topbar strong{font-size:13px}
+.survey-topbar small{font-size:7px}
+
+.household-main{
+  width:min(1320px,calc(100% - 30px));
+  padding:21px 0 56px;
+}
+.field-forms-hero,.household-form-hero{
+  grid-template-columns:minmax(0,1fr) 250px;
+  gap:14px;
+  margin-bottom:14px;
+}
+.field-forms-hero h1,.household-form-hero h1{
+  margin:3px 0 5px;
+  font-size:clamp(30px,4vw,48px);
+}
+.field-forms-hero p,.household-form-hero p{
+  font-size:11px;
+  line-height:1.35;
+}
+.offline-status-card,.household-hero-status{
+  padding:11px;
+  border-radius:13px;
+  gap:8px;
+}
+.household-hero-status strong{font-size:10px}
+.household-hero-status small{font-size:8px}
+
+.household-form label,
+.household-form legend,
+.household-form input,
+.household-form select,
+.household-form textarea{
+  font-size:11px;
+}
+
+.household-form input,
+.household-form select{
+  min-height:38px;
+}
+
+.household-form textarea{
+  padding:8px;
+}
+
+.portal-kicker,.portal-label{font-size:7px}
+.portal-chip{font-size:7px}
+
+@media(max-width:900px){
+  .app-topbar{height:58px;padding:7px 10px}
+  .app-brand strong{font-size:11px}
+  .app-brand small{display:none}
+  .app-main{margin-left:0;padding:72px 12px 76px}
+  .desktop-nav{display:none}
+  .mobile-bottom-nav{display:grid}
+  .hero,.page-head{margin-bottom:10px}
+  .login-card h1,.page-head h1,.hero h1{font-size:29px}
+  .quick-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .quick-card{min-height:88px;padding:10px}
+  .stats-grid,.indicator-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .map-layout,.calendar-layout{grid-template-columns:1fr}
+  #field-map{height:58vh;min-height:360px}
+  .field-forms-hero,.household-form-hero{grid-template-columns:1fr}
+  .household-main{width:min(100% - 20px,900px);padding-top:15px}
+  .field-forms-hero h1,.household-form-hero h1{font-size:31px}
+}
+
+@media(max-width:520px){
+  html,body{font-size:12px}
+  .app-main{padding-left:9px;padding-right:9px}
+  .quick-grid{grid-template-columns:1fr 1fr;gap:6px}
+  .quick-card{min-height:78px}
+  .quick-card strong{font-size:11px}
+  .quick-card small{font-size:7.5px}
+  .stats-grid,.indicator-grid{gap:6px}
+  .stats-grid article,.indicator-grid article{padding:9px}
+  .stats-grid strong,.indicator-grid strong{font-size:19px}
+  .panel-head{padding:9px 10px}
+  .panel-head h2{font-size:16px}
+  .household-form label,
+  .household-form legend{font-size:10px}
+  .household-form input,
+  .household-form select,
+  .household-form textarea{font-size:12px}
+}
+
+/* Keep touch targets usable even though text is compact. */
+button,a.primary,.actions a,.actions button,.mobile-bottom-nav a{touch-action:manipulation}

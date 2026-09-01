@@ -509,7 +509,7 @@
     try {
       updateNetworkUI();
       if ("serviceWorker" in navigator) {
-        navigator.serviceWorker.register("./service-worker.js?v=3").catch(console.warn);
+        navigator.serviceWorker.register("./service-worker.js?v=1").catch(console.warn);
       }
 
       await db.openDB();
@@ -522,7 +522,11 @@
       updateSectionNavigator();
 
       loading.hidden = true;
+      loading.style.setProperty("display","none","important");
+      loading.setAttribute("aria-hidden","true");
       app.hidden = false;
+      app.style.removeProperty("display");
+      document.body.classList.add("aa-app-ready");
       document.body.classList.remove("portal-is-loading");
 
       if (new URLSearchParams(location.search).get("sync_all") === "1" && navigator.onLine) {
