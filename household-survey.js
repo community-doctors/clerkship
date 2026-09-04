@@ -18,7 +18,7 @@
   let saveTimer = null;
 
   const repeaters = [
-    "family_members","breastfeeding","supplementary_feeding","nutrition_children",
+    "family_members","adult_vitals","breastfeeding","supplementary_feeding","nutrition_children",
     "immunization_children","illnesses","deaths","philhealth_members","covid_vaccines",
     "community_leaders","problems"
   ];
@@ -552,7 +552,7 @@
     try {
       updateNetworkUI();
       if ("serviceWorker" in navigator) {
-        navigator.serviceWorker.register("./service-worker.js?v=1").catch(console.warn);
+        navigator.serviceWorker.register("./service-worker.js?v=7").catch(console.warn);
       }
 
       await db.openDB();

@@ -192,3 +192,623 @@ button,a.primary,.actions a,.actions button,.mobile-bottom-nav a{touch-action:ma
 .aa-discard-draft{flex:0 0 auto;margin:7px 9px 7px 0;min-height:34px;padding:0 9px;border-radius:8px;font-size:8px;cursor:pointer}
 .aa-discard-draft:hover,.aa-discard-button:hover{background:#faeeee!important}
 @media(max-width:520px){.aa-survey-open{padding:8px 9px}.aa-discard-draft{min-width:64px;padding:0 7px}}
+
+
+/* ============================================================
+   v6 — Phone UI polish
+   More compact header, clearer bottom nav, cleaner cards,
+   better stacking on small screens.
+   ============================================================ */
+
+@media (max-width: 760px){
+  html,body{
+    overflow-x:hidden;
+  }
+
+  .login-page{
+    padding:14px;
+  }
+
+  .login-card{
+    padding:18px 16px;
+    border-radius:18px;
+    box-shadow:0 14px 38px rgba(41,26,18,.10);
+  }
+
+  .login-card h1{
+    font-size:28px;
+    line-height:.98;
+  }
+
+  .login-card p,
+  .privacy-note{
+    font-size:10px;
+    line-height:1.35;
+  }
+
+  .app-topbar{
+    height:auto;
+    min-height:56px;
+    padding:7px 10px;
+    gap:8px;
+    align-items:center;
+  }
+
+  .app-brand{
+    gap:8px;
+    min-width:0;
+    flex:1 1 auto;
+  }
+
+  .app-brand .brand-mark.small{
+    width:34px;
+    height:34px;
+    border-radius:10px;
+    font-size:12px;
+  }
+
+  .app-brand strong{
+    font-size:11px;
+    line-height:1.05;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+
+  .app-brand small{
+    display:none!important;
+  }
+
+  .app-user{
+    gap:6px;
+    flex:0 0 auto;
+  }
+
+  .app-user .network-chip{
+    display:none!important;
+  }
+
+  .app-user .user-pill{
+    max-width:84px;
+    padding:5px 7px;
+    font-size:8px;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+
+  .app-user button{
+    min-height:31px;
+    padding:0 10px;
+    font-size:9px;
+    border-radius:8px;
+  }
+
+  .app-main{
+    margin-left:0;
+    padding:71px 10px calc(86px + env(safe-area-inset-bottom));
+  }
+
+  .hero,
+  .page-head{
+    margin-bottom:10px;
+  }
+
+  .hero h1,
+  .page-head h1{
+    font-size:28px!important;
+    line-height:.96;
+    margin:4px 0;
+  }
+
+  .hero p,
+  .page-head p{
+    font-size:10px;
+    line-height:1.35;
+    margin:4px 0;
+  }
+
+  .eyebrow,
+  .portal-kicker,
+  .portal-label{
+    font-size:7px;
+  }
+
+  .actions{
+    width:100%;
+    gap:6px;
+  }
+
+  .actions .primary,
+  .actions button,
+  .actions a,
+  .actions .mini-action{
+    flex:1 1 calc(50% - 3px);
+    min-width:0;
+  }
+
+  .quick-grid,
+  .stats-grid,
+  .indicator-grid{
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:7px;
+    margin-bottom:10px;
+  }
+
+  .quick-card{
+    min-height:80px;
+    padding:10px;
+    border-radius:14px;
+    gap:3px;
+  }
+
+  .quick-card > span{
+    font-size:17px;
+  }
+
+  .quick-card strong{
+    font-size:11px;
+    line-height:1.1;
+  }
+
+  .quick-card small{
+    font-size:7px;
+    line-height:1.25;
+  }
+
+  .stats-grid article,
+  .indicator-grid article,
+  .field-sync-summary article{
+    padding:10px;
+    border-radius:14px;
+  }
+
+  .stats-grid span,
+  .indicator-grid span,
+  .field-sync-summary article span{
+    font-size:6.5px;
+  }
+
+  .stats-grid strong,
+  .indicator-grid strong,
+  .field-sync-summary article strong{
+    font-size:18px;
+    margin:2px 0;
+  }
+
+  .stats-grid small,
+  .indicator-grid small,
+  .field-sync-summary article small{
+    font-size:7px;
+    line-height:1.25;
+  }
+
+  .panel{
+    margin-bottom:10px;
+    border-radius:14px;
+  }
+
+  .panel-head{
+    min-height:auto;
+    padding:10px 11px;
+    align-items:flex-start;
+    justify-content:flex-start;
+    flex-direction:column;
+    gap:8px;
+  }
+
+  .panel-head h2{
+    font-size:16px;
+    line-height:1.05;
+    margin:2px 0 0;
+  }
+
+  .panel-head > .pill,
+  .panel-head > button,
+  .panel-head > a,
+  .panel-head .actions{
+    align-self:stretch;
+  }
+
+  .list-row{
+    min-height:auto;
+    padding:10px 11px;
+    flex-direction:column;
+    align-items:flex-start;
+    gap:7px;
+  }
+
+  .list-row > span:first-child,
+  .aa-survey-open > span:first-child{
+    width:100%;
+  }
+
+  .list-row strong,
+  .aa-survey-open strong{
+    font-size:11px;
+    line-height:1.2;
+  }
+
+  .list-row small,
+  .aa-survey-open small,
+  .map-note,
+  .empty,
+  .cache-note,
+  .table-empty,
+  .table-loading{
+    font-size:8px;
+    line-height:1.35;
+  }
+
+  .record-meta{
+    width:100%;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px;
+  }
+
+  .status,
+  .pill,
+  .portal-chip,
+  .user-pill{
+    font-size:7px;
+  }
+
+  .map-layout,
+  .calendar-layout,
+  .notes-grid,
+  .two-cols,
+  .fieldwork-context-card,
+  .survey-grid.two,
+  .survey-grid.three,
+  .survey-grid.four,
+  .survey-grid.six,
+  .digital-fieldwork-grid{
+    grid-template-columns:1fr!important;
+  }
+
+  .fieldwork-context-card > div,
+  .notes-grid,
+  .stack-form,
+  .survey-section-body,
+  .survey-cover-section,
+  .dialog-card{
+    padding:12px;
+  }
+
+  .fieldwork-context-card > div + div{
+    border-left:0!important;
+    border-top:1px solid #e0d6ca;
+  }
+
+  .fieldwork-context-card strong{
+    font-size:15px;
+  }
+
+  .fieldwork-context-card small{
+    font-size:8px;
+    line-height:1.3;
+  }
+
+  .map-panel,
+  .poi-panel{
+    padding:10px;
+  }
+
+  .map-toolbar{
+    display:grid;
+    grid-template-columns:1fr;
+    gap:6px;
+  }
+
+  .map-toolbar .pill,
+  .map-toolbar select,
+  .map-toolbar button{
+    width:100%;
+  }
+
+  #field-map{
+    height:48svh!important;
+    min-height:300px!important;
+  }
+
+  .mini-list{
+    padding:0 10px 10px;
+  }
+
+  .mini-row{
+    padding:8px 0;
+  }
+
+  .calendar-head{
+    grid-template-columns:34px 1fr 34px;
+    padding:10px;
+  }
+
+  .calendar-head strong{
+    font-size:14px;
+  }
+
+  .weekdays,
+  .calendar-grid{
+    gap:3px;
+    padding-left:8px;
+    padding-right:8px;
+  }
+
+  .weekdays span{
+    font-size:6px;
+  }
+
+  .day{
+    min-height:56px;
+    padding:4px;
+    border-radius:8px;
+  }
+
+  .day b{
+    font-size:10px;
+  }
+
+  .day small{
+    display:none;
+  }
+
+  .field-forms-main,
+  .household-main{
+    width:min(100% - 16px, 900px)!important;
+    padding:14px 0 70px;
+  }
+
+  .field-forms-hero,
+  .household-form-hero{
+    grid-template-columns:1fr!important;
+    gap:10px;
+    margin-bottom:10px;
+  }
+
+  .field-forms-hero h1,
+  .household-form-hero h1{
+    font-size:28px!important;
+    line-height:.98;
+  }
+
+  .field-forms-hero p,
+  .household-form-hero p,
+  .offline-status-card small,
+  .household-hero-status small,
+  .survey-help,
+  .priority-card p{
+    font-size:9px;
+    line-height:1.35;
+  }
+
+  .offline-status-card,
+  .household-hero-status,
+  .field-offline-note,
+  .survey-section,
+  .household-form-actions{
+    border-radius:14px;
+  }
+
+  .survey-topbar{
+    min-height:54px;
+    padding:7px 10px;
+    gap:7px;
+  }
+
+  .survey-topbar strong{
+    font-size:11px;
+    line-height:1.1;
+  }
+
+  .survey-topbar small,
+  .survey-sync-chip{
+    font-size:7px;
+  }
+
+  .survey-section summary{
+    grid-template-columns:34px minmax(0,1fr);
+    gap:10px;
+    padding:12px;
+  }
+
+  .survey-section summary > span{
+    width:30px;
+    height:30px;
+    border-radius:10px;
+    font-size:12px;
+  }
+
+  .survey-section summary > strong,
+  .survey-section-heading h2{
+    font-size:17px;
+    line-height:1.1;
+  }
+
+  .survey-section-body h3{
+    font-size:14px;
+    margin:14px 0 8px;
+  }
+
+  .household-form label,
+  .household-form legend,
+  .notes-grid label,
+  .dialog-card label,
+  .stack-form label{
+    font-size:8px;
+  }
+
+  .household-form input,
+  .household-form select,
+  .household-form textarea,
+  .dialog-card input,
+  .dialog-card select,
+  .dialog-card textarea,
+  .stack-form input,
+  .stack-form select,
+  .stack-form textarea,
+  .page-head input,
+  .page-head select{
+    min-height:38px;
+    padding:8px 9px;
+    font-size:11px;
+  }
+
+  .manual-gps > div{
+    grid-template-columns:1fr!important;
+  }
+
+  .household-form-actions{
+    position:static!important;
+    padding:12px;
+    gap:10px;
+  }
+
+  .household-action-buttons{
+    display:grid!important;
+    grid-template-columns:1fr 1fr;
+    gap:7px;
+    width:100%;
+  }
+
+  .household-action-buttons .button,
+  .household-action-buttons button{
+    width:100%;
+    min-height:38px;
+    font-size:9px;
+    box-shadow:none;
+  }
+
+  .aa-survey-row{
+    padding:0!important;
+  }
+
+  .aa-survey-open{
+    flex-direction:column;
+    align-items:flex-start;
+    padding:10px 11px 6px;
+    gap:6px;
+  }
+
+  .aa-discard-draft{
+    margin:0 11px 10px;
+    width:calc(100% - 22px);
+    min-height:32px;
+    font-size:8px;
+  }
+
+  .mobile-bottom-nav{
+    position:fixed!important;
+    left:8px;
+    right:8px;
+    bottom:max(8px, env(safe-area-inset-bottom));
+    z-index:120;
+    height:auto!important;
+    padding:6px;
+    border:1px solid var(--line);
+    border-radius:18px;
+    background:rgba(255,253,248,.98);
+    box-shadow:0 10px 28px rgba(0,0,0,.12);
+    backdrop-filter:blur(10px);
+    display:grid!important;
+    grid-template-columns:repeat(5,minmax(0,1fr));
+    gap:4px;
+  }
+
+  .mobile-bottom-nav a{
+    min-height:46px;
+    padding:5px 3px 4px;
+    border-radius:12px;
+    display:grid;
+    place-items:center;
+    gap:2px;
+    text-decoration:none;
+    color:#645c55;
+    font-size:7px;
+    font-weight:800;
+    text-align:center;
+  }
+
+  .mobile-bottom-nav a::before{
+    display:block;
+    font-size:13px;
+    line-height:1;
+  }
+
+  .mobile-bottom-nav a:nth-child(1)::before{content:"⌂";}
+  .mobile-bottom-nav a:nth-child(2)::before{content:"☰";}
+  .mobile-bottom-nav a:nth-child(3)::before{content:"⌖";}
+  .mobile-bottom-nav a:nth-child(4)::before{content:"◎";}
+  .mobile-bottom-nav a:nth-child(5)::before{content:"◷";}
+
+  .mobile-bottom-nav a.active{
+    background:#f4e8e4;
+    color:var(--maroon);
+  }
+}
+
+@media (max-width: 460px){
+  .app-topbar{
+    padding:6px 8px;
+  }
+
+  .app-brand strong{
+    font-size:10px;
+  }
+
+  .app-user .user-pill{
+    display:none!important;
+  }
+
+  .app-user button{
+    padding:0 8px;
+    font-size:8px;
+  }
+
+  .quick-grid,
+  .stats-grid,
+  .indicator-grid,
+  .field-sync-summary,
+  .household-action-buttons{
+    grid-template-columns:1fr!important;
+  }
+
+  .actions .primary,
+  .actions button,
+  .actions a,
+  .actions .mini-action{
+    flex:1 1 100%;
+  }
+
+  .mobile-bottom-nav a span{
+    font-size:7px;
+  }
+
+  .dialog-card{
+    gap:8px;
+  }
+}
+
+
+/* v7 — respondent details + adult vitals */
+.compact-subheading{
+  margin:14px 0 8px!important;
+  font-family:var(--serif);
+  font-size:14px!important;
+  color:var(--green);
+}
+.repeat-row-vitals{
+  grid-template-columns:repeat(9,minmax(100px,1fr)) 36px;
+  min-width:1050px;
+}
+.adult-vitals-block .repeat-rows{
+  overflow-x:auto;
+  -webkit-overflow-scrolling:touch;
+}
+@media(max-width:760px){
+  .compact-subheading{font-size:13px!important;margin:11px 0 6px!important}
+  .repeat-row-vitals{min-width:980px;grid-template-columns:repeat(9,minmax(92px,1fr)) 34px}
+  .adult-vitals-block .survey-help{font-size:8px}
+}
