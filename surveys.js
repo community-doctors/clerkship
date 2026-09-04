@@ -1,4 +1,89 @@
 AAApp.context().then(async ctx=>{
+  const RAW_META_COLUMNS = [
+    "id","local_uuid","submitted_by","status","household_code","interview_date",
+    "barangay","zone","interviewer","latitude","longitude","gps_accuracy_m",
+    "location_captured_at","photo_path","created_at","updated_at"
+  ];
+
+  function csvValue(value){
+    if(value===null||value===undefined)return "";
+    if(Array.isArray(value)){
+      const simple=value.every(v=>v===null||["string","number","boolean"].includes(typeof v));
+      return simple?value.filter(v=>v!==null).join(" | "):JSON.stringify(value);
+    }
+    if(typeof value==="object")return JSON.stringify(value);
+    return String(value);
+  }
+
+  function csvEscape(value){
+    const s=csvValue(value).replace(/\r?\n/g,"\n");
+    return `"${s.replaceAll('"','""')}"`;
+  }
+
+  async function fetchAllRawRows(){
+    const all=[];
+    const pageSize=1000;
+    for(let from=0;;from+=pageSize){
+      const to=from+pageSize-1;
+      const {data,error}=await ctx.client
+        .from("aa_household_submissions")
+        .select("id,local_uuid,submitted_by,status,household_code,interview_date,barangay,zone,interviewer,response_json,latitude,longitude,gps_accuracy_m,location_captured_at,photo_path,created_at,updated_at")
+        .order("created_at",{ascending:true})
+        .range(from,to);
+      if(error)throw error;
+      const rows=data||[];
+      all.push(...rows);
+      if(rows.length<pageSize)break;
+    }
+    return all;
+  }
+
+  async function downloadRawCsv(){
+    if(!ctx.online()||!ctx.client){
+      alert("Connect to the internet to download the complete synced raw dataset.");
+      return;
+    }
+
+    const btn=document.getElementById("download-csv");
+    btn.disabled=true;
+    const oldText=btn.textContent;
+    btn.textContent="Preparing…";
+
+    try{
+      const rows=await fetchAllRawRows();
+      if(!rows.length){alert("No synced household records yet.");return;}
+
+      const responseKeys=[...new Set(rows.flatMap(r=>Object.keys(r.response_json||{})))].sort((a,b)=>a.localeCompare(b));
+      const headers=[...RAW_META_COLUMNS,...responseKeys.map(k=>`response_${k}`),"response_json_raw"];
+
+      const lines=[headers.map(csvEscape).join(",")];
+      for(const row of rows){
+        const values=[];
+        for(const key of RAW_META_COLUMNS)values.push(row[key]);
+        for(const key of responseKeys)values.push((row.response_json||{})[key]);
+        values.push(row.response_json||{});
+        lines.push(values.map(csvEscape).join(","));
+      }
+
+      const csv="\uFEFF"+lines.join("\r\n");
+      const blob=new Blob([csv],{type:"text/csv;charset=utf-8"});
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement("a");
+      const stamp=new Date().toISOString().slice(0,10);
+      a.href=url;
+      a.download=`alang-alang-household-raw-${stamp}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url),1000);
+    }catch(err){
+      console.error(err);
+      alert(`CSV export failed: ${err.message||err}`);
+    }finally{
+      btn.disabled=false;
+      btn.textContent=oldText;
+    }
+  }
   async function discardDraft(localId){
     const record=await ctx.db.getSubmission(localId);
     if(!record)return;
@@ -86,6 +171,6 @@ AAApp.context().then(async ctx=>{
     await local();await server();
   });
 
-  document.getElementById("refresh-server").addEventListener("click",server);
+  document.getElementById("download-csv")?.addEventListener("click",downloadRawCsv);document.getElementById("refresh-server").addEventListener("click",server);
   await local();await server();
 }).catch(console.error);

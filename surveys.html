@@ -8,7 +8,7 @@
   <title>Surveys | Alang-Alang Fieldwork Hub</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="styles.css?v=3">
-  <link rel="stylesheet" href="compact-ui.css?v=1">
+  <link rel="stylesheet" href="compact-ui.css?v=6">
   
   <style id="aa-hidden-safety">
     [hidden], .app-loading[hidden], #app-loading[hidden], #household-loading[hidden] {
@@ -25,13 +25,13 @@
       <div class="app-user"><span class="network-chip" data-network-chip>Checking…</span><span class="user-pill" data-user-name>Group member</span><button type="button" data-signout>Sign out</button></div>
     </header>
     <aside class="desktop-nav"><a href="dashboard.html" class=""><span>Home</span></a><a href="surveys.html" class="active"><span>Surveys</span></a><a href="map.html" class=""><span>Map</span></a><a href="diagnosis.html" class=""><span>Diagnosis</span></a><a href="calendar.html" class=""><span>Calendar</span></a></aside>
-    <main class="app-main"><section class="page-head"><span class="eyebrow">Offline</span><h1>Surveys</h1><div class="actions"><a class="primary" href="household-survey.html">+ New Survey</a><button id="sync-all" type="button">Sync</button></div></section><section class="panel"><div class="panel-head"><div><span class="eyebrow">This device</span><h2>Local drafts & sync queue</h2></div><span id="local-summary" class="pill">—</span></div><div id="local-list" class="list"><div class="empty">Loading…</div></div></section><section class="panel"><div class="panel-head"><div><span class="eyebrow">Group database</span><h2>Synced household records</h2></div><button id="refresh-server">Refresh</button></div><div id="server-list" class="list"><div class="empty">Loading…</div></div></section></main>
+    <main class="app-main"><section class="page-head"><span class="eyebrow">Offline</span><h1>Surveys</h1><div class="actions"><a class="primary" href="household-survey.html">+ New Survey</a><button id="sync-all" type="button">Sync</button></div></section><section class="panel"><div class="panel-head"><div><span class="eyebrow">This device</span><h2>Local drafts & sync queue</h2></div><span id="local-summary" class="pill">—</span></div><div id="local-list" class="list"><div class="empty">Loading…</div></div></section><section class="panel"><div class="panel-head"><div><span class="eyebrow">Group database</span><h2>Synced household records</h2></div><div class="actions"><button id="download-csv" type="button">Download CSV</button><button id="refresh-server" type="button">Refresh</button></div></div><div id="server-list" class="list"><div class="empty">Loading…</div></div></section></main>
     <nav class="mobile-bottom-nav"><a href="dashboard.html" class=""><span>Home</span></a><a href="surveys.html" class="active"><span>Surveys</span></a><a href="map.html" class=""><span>Map</span></a><a href="diagnosis.html" class=""><span>Diagnosis</span></a><a href="calendar.html" class=""><span>Calendar</span></a></nav>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js"></script>
   <script src="offline-db.js?v=5"></script>
   <script src="app-common.js?v=3"></script>
-  <script src="survey-sync.js?v=1"></script><script src="surveys.js?v=5"></script>
+  <script src="survey-sync.js?v=1"></script><script src="surveys.js?v=8"></script>
 </body>
 </html>
