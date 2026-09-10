@@ -1,0 +1,9 @@
+.aa-survey-row{padding:0!important;display:flex!important;align-items:stretch!important;gap:0!important}
+.aa-record-main{appearance:none;border:0;background:transparent;color:inherit;text-align:left;flex:1 1 auto;min-width:0;padding:9px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;font:inherit}
+.aa-record-static{cursor:default}
+.aa-record-main>span:first-child{display:grid;gap:3px;min-width:0}
+.aa-record-actions{display:flex;align-items:center;gap:5px;padding:7px 8px 7px 0}
+.aa-record-actions button{min-height:32px;padding:0 9px;border:1px solid #d8cec3;border-radius:8px;background:#fff;color:var(--maroon);font-size:8px;font-weight:900;cursor:pointer}
+.aa-record-actions button.danger{border-color:#d9b6b3;background:#fff7f7;color:#8b2429}
+.aa-server-record.is-clickable:hover,.aa-editable-record:hover{background:#fffdf9}
+@media(max-width:760px){.aa-survey-row{flex-direction:column!important}.aa-record-main{width:100%;padding:10px 11px 7px;align-items:flex-start;flex-direction:column}.aa-record-main .record-meta{width:100%;display:flex;justify-content:space-between;align-items:center}.aa-record-actions{width:100%;padding:0 11px 10px;display:grid;grid-template-columns:1fr 1fr}.aa-record-actions button{width:100%;min-height:34px}.aa-record-static{padding-bottom:10px}}
