@@ -1,34 +1,31 @@
-# Alang-Alang Fieldwork Hub — Shared Clerkship Checklist v10
+# Alang-Alang Smart Family Autofill v11
 
-## Run once
-Run `checklist-setup.sql` in Supabase SQL Editor.
+## Replace
+- household-survey.html
+- household-survey.js
+- surveys.html
+- surveys.js
 
-## Upload / replace
-Replace:
-- dashboard.html
-- app-common.js
-- service-worker.js
+## Add
+- smart-profile.css
 
-Add:
-- checklist.html
-- checklist.js
-- checklist.css
-
-Keep your existing `supabase-config.js`.
+## No SQL needed
 
 ## What it does
-- shared group checklist
-- overall + per-section progress
-- all active group members see the same ticks
-- shows who completed an item when member names are available
-- cached offline for viewing; internet required to change ticks
+- Surveys overview shows Interviewer + Encoded by
+- Adds Birthdate + Pregnancy status to household head and family member profiles
+- Birthdate calculates age automatically
+- Smart fill reuses household member identity data without overwriting manually entered answers
+- Adults 18+ are added to Adult Vitals
+- Children 0–24 months are added to Breastfeeding + Supplementary Feeding
+- Children 0–59 months are added to Nutrition, including birthdate
+- Children 0–12 months are added to Immunization, with calculated age in months when birthdate is known
+- Members marked Currently pregnant populate the Prenatal member selector
+- If no eligible member exists, the downstream section is left alone
+- A Refresh fields button is provided as a manual fallback
 
-## Syllabus sections represented
-- Required outputs
-- Entry & organizing
-- Assessment tools
-- Data gathering
-- Mapping & analysis
-- Diagnosis & mobilization
-- Planning & evaluation
-- Course learning outcomes
+## Safety rule
+Smart fill only fills blank identity fields. It does not answer clinical/history questions such as
+breastfed yes/no, immunization doses, prenatal care, vital signs, etc.
+
+Open the app online once after upload so the new CSS/JS are cached for offline use.

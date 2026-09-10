@@ -60,6 +60,9 @@
       if (data[key] !== undefined && data[key] !== null) el.value = data[key];
       el.addEventListener("input", scheduleSave);
       el.addEventListener("change", scheduleSave);
+      if (type === "family_members" && ["name","birthdate","age","sex","pregnancy_status"].includes(key)) {
+        el.addEventListener("change", scheduleSmartFill);
+      }
     });
     row.querySelector(".remove-row")?.addEventListener("click", () => {
       row.remove();
@@ -140,6 +143,181 @@
 
     repeaters.forEach(type => restoreRepeater(type, data[type] || []));
     ensureStarterRows();
+  }
+
+
+  function calcAgeFromBirthdate(birthdate, referenceDate = null) {
+    if (!birthdate) return null;
+    const b = new Date(`${birthdate}T12:00:00`);
+    if (Number.isNaN(b.getTime())) return null;
+    const refValue = referenceDate || form.elements.interview_date?.value;
+    const r = refValue ? new Date(`${refValue}T12:00:00`) : new Date();
+    let age = r.getFullYear() - b.getFullYear();
+    const md = r.getMonth() - b.getMonth();
+    if (md < 0 || (md === 0 && r.getDate() < b.getDate())) age--;
+    return age >= 0 ? age : null;
+  }
+
+  function calcAgeMonths(birthdate, referenceDate = null) {
+    if (!birthdate) return null;
+    const b = new Date(`${birthdate}T12:00:00`);
+    if (Number.isNaN(b.getTime())) return null;
+    const refValue = referenceDate || form.elements.interview_date?.value;
+    const r = refValue ? new Date(`${refValue}T12:00:00`) : new Date();
+    let months = (r.getFullYear() - b.getFullYear()) * 12 + (r.getMonth() - b.getMonth());
+    if (r.getDate() < b.getDate()) months--;
+    return months >= 0 ? months : null;
+  }
+
+  function profileKey(name) {
+    return String(name || "").trim().toLowerCase().replace(/\s+/g, " ");
+  }
+
+  function collectMemberProfiles() {
+    const profiles = [];
+    const headName = form.elements.head_name?.value?.trim();
+    const headBirthdate = form.elements.head_birthdate?.value || "";
+    const headAgeTyped = Number(form.elements.head_age?.value);
+    if (headName) {
+      profiles.push({
+        name: headName,
+        relation: "Self / Household Head",
+        birthdate: headBirthdate,
+        age: calcAgeFromBirthdate(headBirthdate) ?? (Number.isFinite(headAgeTyped) ? headAgeTyped : null),
+        age_months: calcAgeMonths(headBirthdate),
+        sex: form.elements.head_sex?.value || "",
+        pregnancy_status: form.elements.head_pregnancy_status?.value || ""
+      });
+    }
+
+    document.querySelectorAll('#family_members_rows [data-repeater-type="family_members"]').forEach(row => {
+      const get = key => row.querySelector(`[data-field="${key}"]`)?.value || "";
+      const name = get("name").trim();
+      if (!name) return;
+      const birthdate = get("birthdate");
+      const typedAge = Number(get("age"));
+      profiles.push({
+        name,
+        relation: get("relation"),
+        birthdate,
+        age: calcAgeFromBirthdate(birthdate) ?? (Number.isFinite(typedAge) ? typedAge : null),
+        age_months: calcAgeMonths(birthdate),
+        sex: get("sex"),
+        pregnancy_status: get("pregnancy_status")
+      });
+    });
+    return profiles;
+  }
+
+  function fillBlank(el, value) {
+    if (!el || value === null || value === undefined || value === "") return false;
+    if (String(el.value || "").trim() !== "") return false;
+    el.value = String(value);
+    return true;
+  }
+
+  function findRepeaterRowByName(type, name, fieldNames) {
+    const targetKey = profileKey(name);
+    if (!targetKey) return null;
+    return [...document.querySelectorAll(`#${type}_rows [data-repeater-type="${type}"]`)].find(row =>
+      fieldNames.some(field => profileKey(row.querySelector(`[data-field="${field}"]`)?.value) === targetKey)
+    ) || null;
+  }
+
+  function ensureProfileInRepeater(type, profile, nameField, extras = {}) {
+    let row = findRepeaterRowByName(type, profile.name, [nameField, "name", "child_name"]);
+    if (!row) {
+      createRepeaterRow(type, {});
+      const rows = [...document.querySelectorAll(`#${type}_rows [data-repeater-type="${type}"]`)];
+      row = rows[rows.length - 1];
+    }
+    fillBlank(row.querySelector(`[data-field="${nameField}"]`), profile.name);
+    Object.entries(extras).forEach(([field, value]) => fillBlank(row.querySelector(`[data-field="${field}"]`), value));
+  }
+
+  function updateProfileAgesFromBirthdates() {
+    const hb = form.elements.head_birthdate;
+    const ha = form.elements.head_age;
+    if (hb?.value) {
+      const age = calcAgeFromBirthdate(hb.value);
+      if (age !== null) ha.value = age;
+    }
+    document.querySelectorAll('#family_members_rows [data-repeater-type="family_members"]').forEach(row => {
+      const bd = row.querySelector('[data-field="birthdate"]')?.value;
+      const ageEl = row.querySelector('[data-field="age"]');
+      if (bd && ageEl) {
+        const age = calcAgeFromBirthdate(bd);
+        if (age !== null) ageEl.value = age;
+      }
+    });
+  }
+
+  function refreshPregnancySelector(profiles) {
+    const select = document.getElementById("pn-person-name");
+    if (!select) return;
+    const existing = select.value;
+    const pregnant = profiles.filter(p =>
+      String(p.sex).toLowerCase().startsWith("female") &&
+      p.pregnancy_status === "Currently pregnant"
+    );
+    select.innerHTML = '<option value="">Select if applicable</option>' +
+      pregnant.map(p => `<option value="${safe(p.name)}">${safe(p.name)}</option>`).join("");
+    if (pregnant.some(p => p.name === existing)) select.value = existing;
+    else if (!existing && pregnant.length === 1) select.value = pregnant[0].name;
+  }
+
+  async function smartFillFromProfiles({save=true} = {}) {
+    updateProfileAgesFromBirthdates();
+    const profiles = collectMemberProfiles();
+    let adults = 0, infants = 0, under5 = 0, immunization = 0, pregnant = 0;
+
+    for (const p of profiles) {
+      const age = p.age;
+      const ageMonths = p.age_months;
+
+      if (age !== null && age >= 18) {
+        adults++;
+        ensureProfileInRepeater("adult_vitals", p, "name", {age});
+      }
+
+      const eligible024 = ageMonths !== null ? ageMonths <= 24 : (age !== null && age <= 1);
+      if (eligible024) {
+        infants++;
+        ensureProfileInRepeater("breastfeeding", p, "child_name");
+        ensureProfileInRepeater("supplementary_feeding", p, "child_name");
+      }
+
+      const eligible059 = ageMonths !== null ? ageMonths <= 59 : (age !== null && age <= 4);
+      if (eligible059) {
+        under5++;
+        ensureProfileInRepeater("nutrition_children", p, "name", {birthdate:p.birthdate});
+      }
+
+      const eligible012 = ageMonths !== null ? ageMonths <= 12 : (age === 0);
+      if (eligible012) {
+        immunization++;
+        ensureProfileInRepeater("immunization_children", p, "name", {age_months: ageMonths});
+      }
+
+      if (String(p.sex).toLowerCase().startsWith("female") && p.pregnancy_status === "Currently pregnant") {
+        pregnant++;
+      }
+    }
+
+    refreshPregnancySelector(profiles);
+    const summary = document.getElementById("smart-profile-summary");
+    if (summary) {
+      summary.textContent = `${profiles.length} profile${profiles.length===1?"":"s"} · ${adults} adult · ${infants} age 0–24 mo · ${under5} under 5 · ${pregnant} pregnant`;
+    }
+    updateSectionNavigator();
+    if (save) await saveLocal();
+  }
+
+  function scheduleSmartFill() {
+    clearTimeout(window.__aaSmartFillTimer);
+    window.__aaSmartFillTimer = setTimeout(() => {
+      smartFillFromProfiles({save:true}).catch(console.error);
+    }, 650);
   }
 
   function currentGps() {
@@ -499,6 +677,13 @@
       el.addEventListener("change", scheduleSave);
     });
 
+    ["head_name","head_birthdate","head_age","head_sex","head_pregnancy_status","interview_date"].forEach(name => {
+      const el = form.elements[name];
+      if (el) el.addEventListener("change", scheduleSmartFill);
+    });
+    document.getElementById("smart-profile-refresh")?.addEventListener("click", () => smartFillFromProfiles({save:true}));
+    document.getElementById("pn-person-name")?.addEventListener("change", scheduleSave);
+
     document.querySelectorAll(".add-row").forEach(btn => {
       btn.addEventListener("click", () => {
         createRepeaterRow(btn.dataset.repeater);
@@ -552,7 +737,7 @@
     try {
       updateNetworkUI();
       if ("serviceWorker" in navigator) {
-        navigator.serviceWorker.register("./service-worker.js?v=7").catch(console.warn);
+        navigator.serviceWorker.register("./service-worker.js?v=10").catch(console.warn);
       }
 
       await db.openDB();
@@ -560,6 +745,7 @@
       await getAuthContext();
       await loadRecord();
       ensureStarterRows();
+      await smartFillFromProfiles({save:false});
       attachEvents();
       setupSectionNavigator();
       updateSectionNavigator();

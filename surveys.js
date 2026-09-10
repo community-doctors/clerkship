@@ -1,6 +1,21 @@
 AAApp.context().then(async ctx=>{
   const actions = window.AASurveyRecordActions;
   let serverRows = new Map();
+  let memberNames = new Map();
+
+
+  async function loadMemberNames(){
+    if(!ctx.online()||!ctx.client)return;
+    const {data,error}=await ctx.client.from("aa_group_members").select("user_id,display_name").eq("is_active",true);
+    if(!error)memberNames=new Map((data||[]).map(m=>[m.user_id,m.display_name||"Group member"]));
+  }
+
+  function encoderName(userId){
+    if(!userId)return "";
+    if(memberNames.has(userId))return memberNames.get(userId);
+    if(userId===ctx.user?.id)return ctx.member?.display_name||ctx.user?.email||"You";
+    return "Group member";
+  }
 
   const RAW_META_COLUMNS = [
     "id","local_uuid","submitted_by","status","household_code","interview_date",
@@ -109,7 +124,7 @@ AAApp.context().then(async ctx=>{
       const manageable=actions.canManage(ctx,r);
       return `<div class="list-row aa-survey-row aa-editable-record">
         <button class="aa-record-main" type="button" data-edit-local="${ctx.safe(r.local_uuid)}">
-          <span><strong>${ctx.safe(r.household_number||"Household survey")}</strong><small>${ctx.safe([r.barangay,r.zone].filter(Boolean).join(" · ")||"No location details")} · ${ctx.safe(r.form_status||"draft")}</small></span>
+          <span><strong>${ctx.safe(r.household_number||"Household survey")}</strong><small>${ctx.safe([r.barangay,r.zone].filter(Boolean).join(" · ")||"No location details")} · ${ctx.safe(r.form_status||"draft")}</small><small>Interview: ${ctx.safe(r.interviewer||"—")} · Encoded by: ${ctx.safe(encoderName(r.user_id)||"—")}</small></span>
           <span class="record-meta"><i class="status ${ctx.safe(r.sync_status||"pending")}">${ctx.safe(r.sync_status||"pending")}</i><small>${r.has_location?"GPS ✓":"No GPS"}</small></span>
         </button>
         <div class="aa-record-actions">
@@ -148,7 +163,7 @@ AAApp.context().then(async ctx=>{
     const note=cached?'<div class="cache-note">Offline · last synced list · reconnect to edit synced-only records</div>':'';
     t.innerHTML=note+rows.map(r=>{
       const manageable=!cached&&actions.canManage(ctx,r);
-      const content=`<span><strong>${ctx.safe(r.household_code||"Household")}</strong><small>${ctx.safe([r.barangay,r.zone,r.interview_date].filter(Boolean).join(" · "))}</small></span><span class="record-meta"><i class="status synced">${ctx.safe(r.status||"completed")}</i><small>${r.latitude?"GPS ✓":"No GPS"}</small></span>`;
+      const content=`<span><strong>${ctx.safe(r.household_code||"Household")}</strong><small>${ctx.safe([r.barangay,r.zone,r.interview_date].filter(Boolean).join(" · "))}</small><small>Interview: ${ctx.safe(r.interviewer||"—")} · Encoded by: ${ctx.safe(encoderName(r.submitted_by)||"—")}</small></span><span class="record-meta"><i class="status synced">${ctx.safe(r.status||"completed")}</i><small>${r.latitude?"GPS ✓":"No GPS"}</small></span>`;
       return `<div class="list-row aa-survey-row aa-server-record ${manageable?'is-clickable':''}">
         ${manageable?`<button class="aa-record-main" type="button" data-edit-server="${ctx.safe(r.id)}">${content}</button>`:`<div class="aa-record-main aa-record-static">${content}</div>`}
         ${manageable?`<div class="aa-record-actions"><button type="button" data-edit-server="${ctx.safe(r.id)}">Edit</button><button class="danger" type="button" data-discard-server="${ctx.safe(r.id)}">Discard</button></div>`:""}
@@ -169,5 +184,6 @@ AAApp.context().then(async ctx=>{
 
   document.getElementById("download-csv")?.addEventListener("click",downloadRawCsv);
   document.getElementById("refresh-server").addEventListener("click",server);
+  await loadMemberNames();
   await local(); await server();
 }).catch(console.error);
