@@ -9,7 +9,7 @@
     if(ctx)return ctx;
     await db.openDB(); setNetwork();
     window.addEventListener('online',setNetwork);window.addEventListener('offline',setNetwork);
-    if('serviceWorker'in navigator)navigator.serviceWorker.register('./service-worker.js?v=8').catch(console.warn);
+    if('serviceWorker'in navigator)navigator.serviceWorker.register('./service-worker.js?v=10').catch(console.warn);
     if(configReady()&&window.supabase?.createClient){client=window.supabase.createClient(cfg.SUPABASE_URL,cfg.SUPABASE_ANON_KEY);}
     let user=null,member=null;
     if(client){const {data}=await client.auth.getSession();user=data?.session?.user||null;}
@@ -24,16 +24,8 @@
     document.querySelectorAll('[data-user-name]').forEach(el=>el.textContent=member.display_name||user?.email||'Group member');
     document.querySelectorAll('[data-signout]').forEach(btn=>btn.addEventListener('click',ctx.signOut));
     const loading=document.getElementById('app-loading'),shell=document.getElementById('app-shell');
-    if(loading){
-      loading.hidden=true;
-      loading.style.setProperty('display','none','important');
-      loading.setAttribute('aria-hidden','true');
-    }
-    if(shell){
-      shell.hidden=false;
-      shell.style.removeProperty('display');
-      shell.removeAttribute('aria-hidden');
-    }
+    if(loading){loading.hidden=true;loading.style.setProperty('display','none','important');loading.setAttribute('aria-hidden','true');}
+    if(shell){shell.hidden=false;shell.style.removeProperty('display');shell.removeAttribute('aria-hidden');}
     document.body.classList.add('aa-app-ready');
     return ctx;
   }
