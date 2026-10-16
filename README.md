@@ -1,31 +1,46 @@
-# Alang-Alang Smart Family Autofill v11
+# Alang-Alang Full Questionnaire Analytics v13
 
 ## Replace
-- household-survey.html
-- household-survey.js
-- surveys.html
-- surveys.js
+- `diagnosis.html`
+- `diagnosis.js`
 
 ## Add
-- smart-profile.css
+- `diagnosis-analytics.css`
 
 ## No SQL needed
 
-## What it does
-- Surveys overview shows Interviewer + Encoded by
-- Adds Birthdate + Pregnancy status to household head and family member profiles
-- Birthdate calculates age automatically
-- Smart fill reuses household member identity data without overwriting manually entered answers
-- Adults 18+ are added to Adult Vitals
-- Children 0–24 months are added to Breastfeeding + Supplementary Feeding
-- Children 0–59 months are added to Nutrition, including birthdate
-- Children 0–12 months are added to Immunization, with calculated age in months when birthdate is known
-- Members marked Currently pregnant populate the Prenatal member selector
-- If no eligible member exists, the downstream section is left alone
-- A Refresh fields button is provided as a manual fallback
+This version reads all completed household surveys from the existing
+`aa_household_submissions.response_json` and discovers fields dynamically.
 
-## Safety rule
-Smart fill only fills blank identity fields. It does not answer clinical/history questions such as
-breastfed yes/no, immunization doses, prenatal care, vital signs, etc.
+### Graph types
+- Yes/No: donut chart
+- Categorical/dropdown: horizontal bar chart
+- Multi-select/checkbox: prevalence bars
+- Numeric: histogram + n/mean/median/min/max
+- Date: monthly distribution
+- Free text: top response frequencies
+- Repeaters: every nested field is analyzed separately
+- Direct identifiers: completion only; raw values are not shown
 
-Open the app online once after upload so the new CSS/JS are cached for offline use.
+### Filters
+- Barangay
+- Zone
+- Interviewer
+- Encoder/groupmate
+- Interview date range
+- Search by question/field
+
+### Additional views
+- overall survey KPIs
+- GPS coverage
+- questionnaire completion by section
+- expand/collapse all
+- printable analytics
+- summary CSV export
+- existing triangulation notes retained
+- existing priority-problem scoring retained
+
+### Important
+Percentages use answered/non-NA responses where applicable.
+This is descriptive analytics and should be triangulated with field observations,
+secondary data, stakeholder input, and faculty review.

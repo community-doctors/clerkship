@@ -5,33 +5,125 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#7b1113">
   <meta name="robots" content="noindex,nofollow">
-  <title>Community Diagnosis | Alang-Alang Fieldwork Hub</title>
+  <title>Analytics | Alang-Alang Fieldwork Hub</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="styles.css?v=3">
-  <link rel="stylesheet" href="compact-ui.css?v=1">
-  
+  <link rel="stylesheet" href="compact-ui.css?v=7">
+  <link rel="stylesheet" href="diagnosis-analytics.css?v=13">
   <style id="aa-hidden-safety">
-    [hidden], .app-loading[hidden], #app-loading[hidden], #household-loading[hidden] {
-      display: none !important;
-      visibility: hidden !important;
+    [hidden], .app-loading[hidden], #app-loading[hidden] {
+      display:none!important;
+      visibility:hidden!important;
     }
   </style>
 </head>
 <body class="app-body" data-page="diagnosis">
-  <div id="app-loading" class="app-loading"><div class="brand-mark">AA</div><strong>Opening Community Diagnosis…</strong><span>Preparing your group workspace.</span></div>
+  <div id="app-loading" class="app-loading">
+    <div class="brand-mark">AA</div>
+    <strong>Opening Analytics…</strong>
+    <span>Preparing questionnaire data.</span>
+  </div>
+
   <div id="app-shell" hidden>
     <header class="app-topbar">
-      <a href="dashboard.html" class="app-brand"><span class="brand-mark small">AA</span><span><strong>Alang-Alang Fieldwork Hub</strong><small>UPM-SHS · Group Community Diagnosis</small></span></a>
-      <div class="app-user"><span class="network-chip" data-network-chip>Checking…</span><span class="user-pill" data-user-name>Group member</span><button type="button" data-signout>Sign out</button></div>
+      <a href="dashboard.html" class="app-brand">
+        <span class="brand-mark small">AA</span>
+        <span><strong>Alang-Alang Fieldwork Hub</strong><small>UPM-SHS · Group Community Diagnosis</small></span>
+      </a>
+      <div class="app-user">
+        <span class="network-chip" data-network-chip>Checking…</span>
+        <span class="user-pill" data-user-name>Group member</span>
+        <button type="button" data-signout>Sign out</button>
+      </div>
     </header>
-    <aside class="desktop-nav"><a href="dashboard.html" class=""><span>Home</span></a><a href="surveys.html" class=""><span>Surveys</span></a><a href="map.html" class=""><span>Map</span></a><a href="diagnosis.html" class="active"><span>Diagnosis</span></a><a href="calendar.html" class=""><span>Calendar</span></a></aside>
-    <main class="app-main"><section class="page-head"><span class="eyebrow">Community Diagnosis</span><h1>Diagnosis</h1></section><section id="indicator-grid" class="indicator-grid"><div class="empty">Loading indicators…</div></section><section class="panel"><div class="panel-head"><div><span class="eyebrow">Evidence</span><h2>Notes</h2></div><span id="notes-status" class="pill">Saved to group</span></div><div class="notes-grid"><label>Field observations<textarea data-note="field_observations" rows="5" placeholder="Environmental observations, household patterns, access barriers…"></textarea></label><label>Secondary data<textarea data-note="secondary_data" rows="5" placeholder="RHU/barangay records, census, reports…"></textarea></label><label>Stakeholder input<textarea data-note="stakeholder_input" rows="5" placeholder="BHW, MHO, barangay leaders, community members…"></textarea></label><label>Data quality & limitations<textarea data-note="limitations" rows="5" placeholder="Sampling limitations, missing data, possible bias…"></textarea></label></div></section><section class="panel"><div class="panel-head"><div><span class="eyebrow">Priority setting</span><h2>Priority health problems</h2></div><button id="add-priority" class="primary">+ Add priority</button></div><div id="priority-list" class="priority-list"><div class="empty">Loading…</div></div></section></main>
-    <nav class="mobile-bottom-nav"><a href="dashboard.html" class=""><span>Home</span></a><a href="surveys.html" class=""><span>Surveys</span></a><a href="map.html" class=""><span>Map</span></a><a href="diagnosis.html" class="active"><span>Diagnosis</span></a><a href="calendar.html" class=""><span>Calendar</span></a></nav>
+
+    <aside class="desktop-nav">
+      <a href="dashboard.html"><span>Home</span></a>
+      <a href="surveys.html"><span>Surveys</span></a>
+      <a href="map.html"><span>Map</span></a>
+      <a href="diagnosis.html" class="active"><span>Diagnosis</span></a>
+      <a href="calendar.html"><span>Calendar</span></a>
+      <a href="checklist.html"><span>Checklist</span></a>
+    </aside>
+
+    <main class="app-main analytics-main">
+      <section class="page-head analytics-head">
+        <span class="eyebrow">Community Diagnosis</span>
+        <h1>Survey Analytics</h1>
+
+        <div class="analytics-filter-grid">
+          <select id="filter-barangay"><option value="">All barangays</option></select>
+          <select id="filter-zone"><option value="">All zones</option></select>
+          <select id="filter-interviewer"><option value="">All interviewers</option></select>
+          <select id="filter-encoder"><option value="">All encoders</option></select>
+          <label class="date-filter"><span>From</span><input id="filter-from" type="date"></label>
+          <label class="date-filter"><span>To</span><input id="filter-to" type="date"></label>
+        </div>
+
+        <div class="analytics-actions">
+          <input id="question-search" type="search" placeholder="Search question / field…">
+          <button id="reset-filters" type="button">Reset</button>
+          <button id="expand-all" type="button">Expand all</button>
+          <button id="collapse-all" type="button">Collapse all</button>
+          <button id="export-summary" type="button">Summary CSV</button>
+          <button id="print-analytics" type="button">Print</button>
+          <span id="record-count" class="pill">—</span>
+        </div>
+      </section>
+
+      <section id="analytics-overview" class="analytics-overview"></section>
+
+      <section class="panel analytics-summary-panel">
+        <div class="panel-head">
+          <div><span class="eyebrow">Coverage</span><h2>Questionnaire Completion</h2></div>
+          <span id="questions-graphed" class="pill">—</span>
+        </div>
+        <div id="section-completeness" class="section-completeness"></div>
+      </section>
+
+      <nav id="analytics-nav" class="analytics-nav" aria-label="Analytics sections"></nav>
+      <div id="questionnaire-analytics"></div>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div><span class="eyebrow">Evidence</span><h2>Triangulation Notes</h2></div>
+          <span id="notes-status" class="pill">Saved to group</span>
+        </div>
+        <div class="notes-grid">
+          <label>Field observations<textarea data-note="field_observations" rows="5" placeholder="Observations, access barriers, patterns…"></textarea></label>
+          <label>Secondary data<textarea data-note="secondary_data" rows="5" placeholder="RHU/barangay records, census, reports…"></textarea></label>
+          <label>Stakeholder input<textarea data-note="stakeholder_input" rows="5" placeholder="BHW, MHO, leaders, community members…"></textarea></label>
+          <label>Data quality & limitations<textarea data-note="limitations" rows="5" placeholder="Sampling, missing data, possible bias…"></textarea></label>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div><span class="eyebrow">Priority Setting</span><h2>Priority Health Problems</h2></div>
+          <button id="add-priority" class="primary">+ Add priority</button>
+        </div>
+        <div id="priority-list" class="priority-list"><div class="empty">Loading…</div></div>
+      </section>
+
+      <p class="analytics-footnote">
+        Descriptive survey analytics. Percentages use answered, non-NA responses unless otherwise shown.
+        Names and other direct identifiers are excluded from aggregate chart values.
+      </p>
+    </main>
+
+    <nav class="mobile-bottom-nav">
+      <a href="dashboard.html"><span>Home</span></a>
+      <a href="surveys.html"><span>Surveys</span></a>
+      <a href="map.html"><span>Map</span></a>
+      <a href="diagnosis.html" class="active"><span>Diagnosis</span></a>
+      <a href="calendar.html"><span>Calendar</span></a>
+    </nav>
   </div>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js"></script>
-  <script src="offline-db.js?v=1"></script>
-  <script src="app-common.js?v=3"></script>
-  <script src="diagnosis.js?v=1"></script>
+  <script src="offline-db.js?v=5"></script>
+  <script src="app-common.js?v=10"></script>
+  <script src="diagnosis.js?v=13"></script>
 </body>
 </html>
