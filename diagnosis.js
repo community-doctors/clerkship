@@ -869,6 +869,25 @@ AAApp.context().then(async ctx=>{
     return age>=0&&age<=120?age:null;
   }
 
+
+  function ageMonthsFromBirthdate(birthdate,interviewDate){
+    if(blank(birthdate))return null;
+    const b=new Date(`${normalize(birthdate)}T12:00:00`);
+    const ref=interviewDate?new Date(`${normalize(interviewDate)}T12:00:00`):new Date();
+    if(Number.isNaN(b.getTime())||Number.isNaN(ref.getTime())||b>ref)return null;
+    let months=(ref.getFullYear()-b.getFullYear())*12+(ref.getMonth()-b.getMonth());
+    if(ref.getDate()<b.getDate())months--;
+    return months>=0&&months<=1440?months:null;
+  }
+
+  function exactOrEstimatedAgeMonths(person){
+    const exact=ageMonthsFromBirthdate(person.birthdate,person.interviewDate);
+    if(exact!==null)return {months:exact,source:"birthdate"};
+    if(person.age===0)return {months:0,source:"age-fallback"};
+    if(person.age===1)return {months:12,source:"age-fallback"};
+    return {months:null,source:"unknown"};
+  }
+
   function cleanProfileAge(typedAge,birthdate,interviewDate,audit){
     const typed=numericValue(typedAge);
     const dobAge=ageFromBirthdate(birthdate,interviewDate);
@@ -957,6 +976,9 @@ AAApp.context().then(async ctx=>{
     deduped.forEach(p=>{
       p.sex_group=canonicalSex(p.sex);
       p.age_band=profileAgeBand(p.age);
+      const monthAge=exactOrEstimatedAgeMonths(p);
+      p.age_months=monthAge.months;
+      p.age_months_source=monthAge.source;
       if(p.age===null)audit.missingAge++;
       if(p.sex_group==="Unknown / not stated")audit.missingSex++;
     });
@@ -1159,6 +1181,13 @@ AAApp.context().then(async ctx=>{
 
     const checks=[
       {
+        label:"Children 0–23 months = 0–11 + 12–23",
+        pass:infant023Stats().total===infant023Stats().infant011+infant023Stats().child1223,
+        detail:"Checks the denominator used for infant and young-child indicators.",
+        values:`0–23 mo ${infant023Stats().total} · Subgroups ${infant023Stats().infant011+infant023Stats().child1223}`
+      },
+
+      {
         label:"Population total = sex categories",
         pass:people.length===sexSum,
         detail:"Every canonical household member should fall into Male, Female, Other, or Unknown.",
@@ -1301,11 +1330,37 @@ AAApp.context().then(async ctx=>{
     </div>`;
   }
 
+
+  function infant023Stats(){
+    const people=getPopulationProfiles();
+    const eligible=people.filter(p=>p.age_months!==null&&p.age_months>=0&&p.age_months<=23);
+    const infant011=eligible.filter(p=>p.age_months<=11);
+    const child1223=eligible.filter(p=>p.age_months>=12&&p.age_months<=23);
+    const exact=eligible.filter(p=>p.age_months_source==="birthdate");
+    const fallback=eligible.filter(p=>p.age_months_source==="age-fallback");
+    return {total:eligible.length,infant011:infant011.length,child1223:child1223.length,exact:exact.length,fallback:fallback.length};
+  }
+
+  function infant023Card(){
+    const s=infant023Stats();
+    return profileCard(
+      "Children 0–23 Months",
+      `<div class="infant-age-breakdown">
+        <div class="infant-age-stat"><span>Total 0–23 months</span><strong>${s.total}</strong><small>Eligible population</small></div>
+        <div class="infant-age-stat"><span>0–11 months</span><strong>${s.infant011}</strong><small>Infants</small></div>
+        <div class="infant-age-stat"><span>12–23 months</span><strong>${s.child1223}</strong><small>Young children</small></div>
+      </div>
+      <div class="infant-method-note"><strong>Age source:</strong> ${s.exact} exact from birthdate + interview date; ${s.fallback} from recorded age fallback.</div>`,
+      "Use this denominator for indicators requiring the 0–23-month population",
+      true
+    );
+  }
+
   function healthProfile(){
     const people=getPopulationProfiles();
     const pregnant=people.filter(p=>/^currently pregnant$/i.test(p.pregnancy_status)).length;
     const under5=people.filter(p=>p.age!==null&&p.age<5).length;
-    const under2=people.filter(p=>p.age!==null&&p.age<2).length;
+    const infant023=infant023Stats();
     const adults=people.filter(p=>p.age!==null&&p.age>=18).length;
     const illnessRows=repeaterRows("illnesses");
     const deathRows=repeaterRows("deaths");
@@ -1323,13 +1378,14 @@ AAApp.context().then(async ctx=>{
     const kpis=`<div class="profile-kpis">
       ${profileKpi("Adults 18+",adults,"profiled members")}
       ${profileKpi("Children <5",under5,"profiled members")}
-      ${profileKpi("Children <2",under2,"profiled members")}
+      ${profileKpi("Children 0–23 mo.",infant023.total,"eligible population")}
       ${profileKpi("Pregnant",pregnant,"marked currently pregnant")}
       ${profileKpi("Illness records",illnessRows.length,"survey rows")}
       ${profileKpi("Death records",deathRows.length,"survey rows")}
     </div>`;
 
     return `${kpis}<div class="profile-grid three">
+      ${infant023Card()}
       ${yesNoMini("Exclusive Breastfeeding 6 Months",bf)}
       ${yesNoMini("Supplementary Feeding",supp)}
       ${profileCard("Child Weight Status",simpleDistribution(weightStatus),"Nutrition rows")}

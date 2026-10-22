@@ -1,6 +1,6 @@
-# Alang-Alang WARA Age Brackets v19
+# Alang-Alang 0–23 Months Population v20
 
-Builds on Cross-Matched & Audited Analytics v18.
+Builds on v19 WARA Age Brackets.
 
 ## Replace
 - diagnosis.html
@@ -9,35 +9,20 @@ Builds on Cross-Matched & Audited Analytics v18.
 
 ## No SQL needed
 
-## Age brackets now used throughout Community Diagnosis
-All population-level visuals now use the age grouping shown in the provided reference table:
+## Added
+The Health tab now automatically computes:
+- Total children 0–23 months
+- 0–11 months
+- 12–23 months
+- number derived from exact birthdate + interview date
+- number derived from recorded age fallback
 
-- 0–11 mos.
-- 1–4
-- 5–9
-- 10–14
-- 15–19
-- 20–49
-- 50–59
-- 60 and above
+Birthdate is preferred. If birthdate is unavailable:
+- recorded age 0 years is classified as 0–11 months
+- recorded age 1 year is classified as 12–23 months
+- age 2 years and above is not included
 
-These brackets are applied consistently to:
-- Population Pyramid
-- Age Structure
-- Civil Status × Age Group
-- Education × Age Group
-- illness age grouping
-- Data Audit age-band reconciliation
+The same canonical deduplicated population dataset used by the demographic dashboard is used here.
 
-## Data consistency retained
-The v18 reconciliation logic is retained:
-- one canonical deduplicated population dataset
-- birthdate-derived age preferred when available
-- entered age used as fallback
-- missing/other sex retained instead of silently excluded
-- Data Audit cross-checks age totals and derived counts
-
-## Note
-Dependency ratio still follows its own demographic definition in the app:
-young <15, working age 15–64, older 65+.
-That calculation is separate from the display brackets above.
+The Data Audit tab also checks:
+0–23 months = 0–11 months + 12–23 months.

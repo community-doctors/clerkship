@@ -261,3 +261,12 @@
   .audit-row{grid-template-columns:20px 1fr}
   .audit-values{grid-column:2;text-align:left}
 }
+
+/* v20 — exact 0–23 month extraction */
+.infant-age-breakdown{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+.infant-age-stat{border:1px solid #ddd;background:#fff;border-radius:8px;padding:9px;text-align:center}
+.infant-age-stat span{display:block;font-size:6.5px;font-weight:800;color:#666;text-transform:uppercase}
+.infant-age-stat strong{display:block;margin-top:3px;font:700 20px "Times New Roman",Times,serif;color:#111}
+.infant-age-stat small{display:block;margin-top:2px;font:400 6.5px/1.3 "Times New Roman",Times,serif;color:#666}
+.infant-method-note{margin-top:7px;padding:6px 8px;border-left:2px solid #777;background:#fafafa;font:400 7px/1.4 "Times New Roman",Times,serif;color:#444}
+@media(max-width:600px){.infant-age-breakdown{grid-template-columns:1fr}}
