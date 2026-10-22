@@ -844,18 +844,18 @@ AAApp.context().then(async ctx=>{
   }
 
 
-  const PROFILE_AGE_BANDS=["<1","1–4","5–9","10–14","15–19","20–39","40–59","60+"];
+  const PROFILE_AGE_BANDS=["0–11 mos.","1–4","5–9","10–14","15–19","20–49","50–59","60 and above"];
 
   function profileAgeBand(age){
     if(age===null||age===undefined||Number.isNaN(age))return "Unknown";
-    if(age<1)return "<1";
+    if(age<1)return "0–11 mos.";
     if(age<=4)return "1–4";
     if(age<=9)return "5–9";
     if(age<=14)return "10–14";
     if(age<=19)return "15–19";
-    if(age<=39)return "20–39";
-    if(age<=59)return "40–59";
-    return "60+";
+    if(age<=49)return "20–49";
+    if(age<=59)return "50–59";
+    return "60 and above";
   }
 
   function ageFromBirthdate(birthdate,interviewDate){
@@ -1147,9 +1147,9 @@ AAApp.context().then(async ctx=>{
     const sexSum=Object.values(sexCounts).reduce((a,b)=>a+b,0);
 
     const under5=knownAge.filter(p=>p.age<5).length;
-    const under5Bands=(ageCounts["<1"]||0)+(ageCounts["1–4"]||0);
+    const under5Bands=(ageCounts["0–11 mos."]||0)+(ageCounts["1–4"]||0);
     const under15=knownAge.filter(p=>p.age<15).length;
-    const under15Bands=(ageCounts["<1"]||0)+(ageCounts["1–4"]||0)+(ageCounts["5–9"]||0)+(ageCounts["10–14"]||0);
+    const under15Bands=(ageCounts["0–11 mos."]||0)+(ageCounts["1–4"]||0)+(ageCounts["5–9"]||0)+(ageCounts["10–14"]||0);
     const dep=dependencyStats(people);
     const dependencySum=dep.young+dep.working+dep.older;
 
@@ -1171,7 +1171,7 @@ AAApp.context().then(async ctx=>{
         values:`Known age ${knownAge.length} · Age bands ${ageSum}`
       },
       {
-        label:"Under-5 count = <1 + 1–4",
+        label:"Under-5 count = 0–11 mos. + 1–4",
         pass:under5===under5Bands,
         detail:"This specifically checks the discrepancy you noticed.",
         values:`Under 5 ${under5} · Bands ${under5Bands}`
@@ -1179,7 +1179,7 @@ AAApp.context().then(async ctx=>{
       {
         label:"Age <15 = pediatric age bands",
         pass:under15===under15Bands,
-        detail:"Checks <1, 1–4, 5–9, and 10–14 against the derived age threshold.",
+        detail:"Checks 0–11 mos., 1–4, 5–9, and 10–14 against the derived age threshold.",
         values:`Age <15 ${under15} · Bands ${under15Bands}`
       },
       {
@@ -1254,7 +1254,7 @@ AAApp.context().then(async ctx=>{
       ${profileKpi("Population",people.length,"profiled members")}
       ${profileKpi("Avg. household size",fmt(avg,1),"profiled people / household")}
       ${profileKpi("Under 5",under5,"profiled children")}
-      ${profileKpi("Age 60+",older,"profiled older adults")}
+      ${profileKpi("Age 60 and above",older,"profiled older adults")}
       ${profileKpi("Pregnant",pregnant,"marked currently pregnant")}
       ${profileKpi("Dependency ratio",dep.ratio===null?"—":`${dep.ratio}`,"dependents per 100 ages 15–64")}
     </div>`;
