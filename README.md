@@ -1,6 +1,6 @@
-# Alang-Alang APA Paper Graphs v16
+# Alang-Alang Cleaned All-Categories Analytics v17
 
-Builds on Downloadable Graphs v15.
+Builds on APA Paper Graphs v16.
 
 ## Replace
 - `diagnosis.html`
@@ -9,38 +9,33 @@ Builds on Downloadable Graphs v15.
 
 ## No SQL needed
 
-## APA / formal paper export
-Every graph/card download is now formatted for manuscript use:
+## New data cleaning
+Equivalent responses are automatically grouped before graphing:
+- capitalization differences
+- extra spaces
+- punctuation / hyphen differences
+- common singular/plural variants
+- conservative close-spelling typo matching
+- selected common health abbreviations and synonyms, e.g.:
+  - HTN / hypertension / hypertensive / high blood pressure → Hypertension
+  - DM / diabetes / diabetes mellitus → Diabetes mellitus
+  - UTI → Urinary tract infection
+  - URI / URTI → Upper respiratory tract infection
+  - PTB / TB / tuberculosis → Tuberculosis
+  - diarrhoea / diarrhea → Diarrhea
+
+The original survey records are NOT changed. Cleaning happens only for analytics display/export.
+
+## All categories shown
+Categorical, free-text frequency, illness, occupation, problem, environmental, and other frequency graphs now show ALL detected categories instead of only Top 8 / Top 10 / Top 12.
+
+Matrices such as education × age and civil status × age also show all detected columns.
+
+## APA export retained
 - Times New Roman
+- grayscale/black
 - white background
-- black / grayscale visual treatment
-- minimal decorative borders
-- high-resolution 3× PNG export
-- SVG fallback if PNG export is blocked by the browser
-- direct identifiers remain hidden
-
-The live dashboard can still use its normal UI colors. The APA styling is applied to the downloaded image only.
-
-## Recommended APA 7 figure formatting in Word / Google Docs
-Place these as editable text outside the image:
-
-**Figure 1**  
-*Age and Sex Distribution of Surveyed Household Members*
-
-[insert exported graph]
-
-*Note.* Percentages are based on nonmissing responses. Replace or expand the note as needed.
-
-Use figure numbers in the order figures first appear in your paper. Do not rely on an image-baked figure number because you may reorder the figures during writing.
-
-## Existing features retained
-- Community Profile views
-- population pyramid
-- demographic matrices
-- health analytics
-- environmental/community analytics
-- full field-by-field questionnaire analytics
-- filters
-- Summary CSV
-- Print
-- notes and priority scoring
+- high-resolution PNG
+- SVG fallback
+- download per graph/card
+- download current Community Profile view

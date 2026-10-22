@@ -471,32 +471,143 @@ AAApp.context().then(async ctx=>{
     return avg>35||unique.length>12?"text":"categorical";
   }
 
+
+  const RESPONSE_ALIASES=new Map(Object.entries({
+    "htn":"Hypertension",
+    "hypertension":"Hypertension",
+    "hypertensive":"Hypertension",
+    "high blood":"Hypertension",
+    "high blood pressure":"Hypertension",
+    "highblood":"Hypertension",
+    "dm":"Diabetes mellitus",
+    "diabetes":"Diabetes mellitus",
+    "diabetes mellitus":"Diabetes mellitus",
+    "type 2 diabetes":"Diabetes mellitus",
+    "type ii diabetes":"Diabetes mellitus",
+    "uti":"Urinary tract infection",
+    "urinary tract infection":"Urinary tract infection",
+    "urti":"Upper respiratory tract infection",
+    "uri":"Upper respiratory tract infection",
+    "upper respiratory infection":"Upper respiratory tract infection",
+    "upper respiratory tract infection":"Upper respiratory tract infection",
+    "tb":"Tuberculosis",
+    "pulmonary tb":"Tuberculosis",
+    "ptb":"Tuberculosis",
+    "tuberculosis":"Tuberculosis",
+    "diarrhoea":"Diarrhea",
+    "diarrhea":"Diarrhea",
+    "covid":"COVID-19",
+    "covid 19":"COVID-19",
+    "covid-19":"COVID-19",
+    "none":"None",
+    "no illness":"None",
+    "no illnesses":"None",
+    "nil":"None"
+  }));
+
+  function basicCategoryKey(value){
+    return normalize(value)
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g,"")
+      .toLowerCase()
+      .replace(/&/g," and ")
+      .replace(/[\/_-]+/g," ")
+      .replace(/[^\p{L}\p{N}\s]/gu," ")
+      .replace(/\s+/g," ")
+      .trim();
+  }
+
+  function singularLike(key){
+    if(key.length>5 && key.endsWith("ies"))return key.slice(0,-3)+"y";
+    if(key.length>5 && key.endsWith("s") && !key.endsWith("ss") && !key.endsWith("us"))return key.slice(0,-1);
+    return key;
+  }
+
+  function editDistance(a,b){
+    if(a===b)return 0;
+    if(!a.length)return b.length;
+    if(!b.length)return a.length;
+    const prev=Array.from({length:b.length+1},(_,i)=>i);
+    for(let i=1;i<=a.length;i++){
+      let left=i,diag=i-1;
+      prev[0]=i;
+      for(let j=1;j<=b.length;j++){
+        const up=prev[j];
+        const val=Math.min(
+          up+1,
+          left+1,
+          diag+(a[i-1]===b[j-1]?0:1)
+        );
+        diag=up;
+        prev[j]=val;
+        left=val;
+      }
+    }
+    return prev[b.length];
+  }
+
+  function nearSameCategory(a,b){
+    if(a===b)return true;
+    const sa=singularLike(a),sb=singularLike(b);
+    if(sa===sb)return true;
+    const minLen=Math.min(sa.length,sb.length),maxLen=Math.max(sa.length,sb.length);
+    if(minLen<5)return false;
+    if(sa.slice(0,3)!==sb.slice(0,3))return false;
+    const allowed=maxLen>=10?2:1;
+    return Math.abs(sa.length-sb.length)<=allowed && editDistance(sa,sb)<=allowed;
+  }
+
+  function prettyCategory(value){
+    const raw=normalize(value);
+    const key=basicCategoryKey(raw);
+    if(RESPONSE_ALIASES.has(key))return RESPONSE_ALIASES.get(key);
+    if(!raw)return raw;
+    if(raw===raw.toUpperCase() && raw.length<=6)return raw;
+    return raw.replace(/\b\w/g,c=>c.toUpperCase());
+  }
+
+  function canonicalCategory(value){
+    const raw=normalize(value);
+    const key=basicCategoryKey(raw);
+    const alias=RESPONSE_ALIASES.get(key);
+    return {key:alias?basicCategoryKey(alias):singularLike(key),label:alias||prettyCategory(raw)};
+  }
+
   function counts(vals,{multi=false}={}){
-    const m=new Map();
+    const groups=[];
     vals.forEach(raw=>{
       const items=multi?(Array.isArray(raw)?raw:[raw]):[raw];
       items.forEach(v=>{
         if(blank(v))return;
-        const label=normalize(v);
-        const key=label.toLowerCase();
-        if(!m.has(key))m.set(key,{label,count:0});
-        m.get(key).count++;
+        const c=canonicalCategory(v);
+        if(!c.key)return;
+        let found=groups.find(g=>nearSameCategory(g.key,c.key));
+        if(!found){
+          found={key:c.key,label:c.label,count:0,variants:new Set()};
+          groups.push(found);
+        }
+        found.count++;
+        found.variants.add(normalize(v));
+        if(c.label.length<found.label.length && !RESPONSE_ALIASES.has(found.key))found.label=c.label;
       });
     });
-    return [...m.values()].sort((a,b)=>b.count-a.count||a.label.localeCompare(b.label));
+    return groups
+      .map(g=>({label:g.label,count:g.count,variants:[...g.variants]}))
+      .sort((a,b)=>b.count-a.count||a.label.localeCompare(b.label));
   }
 
   function answeredCount(vals){return vals.filter(v=>!blank(v)).length}
 
-  function renderBars(items,denom,limit=10){
+  function renderBars(items,denom,limit=Infinity){
     if(!items.length)return '<div class="no-data-box">No answered data.</div>';
-    const shown=items.slice(0,limit);
+    const shown=Number.isFinite(limit)?items.slice(0,limit):items;
     const max=Math.max(...shown.map(x=>x.count),1);
-    return `<div class="bar-chart">${shown.map(x=>{
+    return `<div class="bar-chart all-categories">${shown.map(x=>{
       const percent=denom?pct(x.count,denom):0;
       const width=Math.max(3,Math.round(x.count/max*100));
-      return `<div class="bar-row"><span class="bar-label">${safe(x.label)}</span><span class="bar-track"><i style="width:${width}%"></i></span><span class="bar-value">${x.count}${denom?` · ${percent}%`:""}</span></div>`;
-    }).join("")}</div>${items.length>limit?`<div class="more-note">Top ${limit} of ${items.length} responses</div>`:""}`;
+      const variantNote=x.variants&&x.variants.length>1?` title="Combined variants: ${safe(x.variants.join(" | "))}"`:"";
+      return `<div class="bar-row"${variantNote}><span class="bar-label">${safe(x.label)}</span><span class="bar-track"><i style="width:${width}%"></i></span><span class="bar-value">${x.count}${denom?` · ${percent}%`:""}</span></div>`;
+    }).join("")}</div>`;
   }
 
   function binaryChart(vals){
@@ -558,14 +669,14 @@ AAApp.context().then(async ctx=>{
     const answered=vals.filter(v=>!blank(v));
     const itemCounts=counts(answered);
     const unique=itemCounts.length;
-    const chart=renderBars(itemCounts,answered.length,8);
+    const chart=renderBars(itemCounts,answered.length);
     return `${chart}<div class="text-note">${unique} unique response${unique===1?"":"s"} among ${answered.length} answered.</div>`;
   }
 
   function multiChart(vals){
     const answered=vals.filter(v=>Array.isArray(v)&&v.length);
     const items=counts(answered,{multi:true});
-    return renderBars(items,answered.length,12);
+    return renderBars(items,answered.length);
   }
 
   function chartFor(vals,key,type){
@@ -575,7 +686,7 @@ AAApp.context().then(async ctx=>{
     if(type==="date")return dateChart(vals);
     if(type==="multi")return multiChart(vals);
     if(type==="text")return textChart(vals);
-    if(type==="categorical")return renderBars(counts(vals),answeredCount(vals),12);
+    if(type==="categorical")return renderBars(counts(vals),answeredCount(vals));
     if(type==="empty")return '<div class="no-data-box">No answered data.</div>';
     return '<div class="no-data-box">Nested data summarized below.</div>';
   }
@@ -823,15 +934,15 @@ AAApp.context().then(async ctx=>{
     </div>`;
   }
 
-  function simpleDistribution(values,limit=10){
+  function simpleDistribution(values,limit=Infinity){
     const vals=values.filter(v=>!blank(v));
-    return renderBars(counts(vals),vals.length,limit);
+    return renderBars(counts(vals),vals.length);
   }
 
   function matrixChart(people,rowFn,colField,rowOrder=null,colLimit=7){
     const rows=rowOrder||[...new Set(people.map(rowFn).filter(Boolean))];
     const colCounts=counts(people.map(p=>p[colField]).filter(v=>!blank(v)));
-    const cols=colCounts.slice(0,colLimit).map(x=>x.label);
+    const cols=colCounts.map(x=>x.label);
     if(!rows.length||!cols.length)return '<div class="profile-empty">Not enough data for this matrix.</div>';
     const table={};
     let max=0;
@@ -898,7 +1009,7 @@ AAApp.context().then(async ctx=>{
       if(age===null||!illness)return;
       bands.push(`${profileAgeBand(age)} · ${illness}`);
     });
-    return simpleDistribution(bands,10);
+    return simpleDistribution(bands);
   }
 
   function zoneComparison(){
@@ -931,7 +1042,7 @@ AAApp.context().then(async ctx=>{
 
   function topCommunityProblems(){
     const vals=repeaterRows("problems").map(r=>r.problem).filter(v=>!blank(v));
-    return simpleDistribution(vals,10);
+    return simpleDistribution(vals);
   }
 
   function overviewProfile(){
@@ -960,8 +1071,8 @@ AAApp.context().then(async ctx=>{
       ${profileCard("Population Pyramid",populationPyramid(people),"Age × sex",true)}
       ${profileCard("Age Structure",simpleDistribution(ageDist),"Profiled household members")}
       ${profileCard("Household Size",householdSizeDistribution(people),"Based on listed household profiles")}
-      ${profileCard("Family Income",renderBars(counts(income),answeredCount(income),10),"Household distribution")}
-      ${profileCard("Top Reported Illnesses",simpleDistribution(illness,8),"From illness records")}
+      ${profileCard("Family Income",renderBars(counts(income),answeredCount(income)),"Household distribution")}
+      ${profileCard("Top Reported Illnesses",simpleDistribution(illness),"From illness records")}
     </div>
     <div class="profile-note"><strong>Derived view:</strong> population totals depend on household head + family members entered in the survey. Missing member profiles are not imputed.</div>`;
   }
@@ -990,7 +1101,7 @@ AAApp.context().then(async ctx=>{
       ${profileCard("Sex Distribution",simpleDistribution(sex),"All profiled members")}
       ${profileCard("Civil Status × Age Group",matrixChart(civil,p=>profileAgeBand(p.age),"civil_status",PROFILE_AGE_BANDS),"Counts among members with both age and civil status",true)}
       ${profileCard("Education × Age Group",matrixChart(edu,p=>profileAgeBand(p.age),"education",PROFILE_AGE_BANDS),"Top educational attainment categories",true)}
-      ${profileCard("Common Occupations",simpleDistribution(occupation,10),"Household head + member occupations")}
+      ${profileCard("Common Occupations",simpleDistribution(occupation),"Household head + member occupations")}
     </div>`;
   }
 
@@ -1029,10 +1140,10 @@ AAApp.context().then(async ctx=>{
       ${profileCard("Child Height Status",simpleDistribution(heightStatus),"Nutrition rows")}
       ${profileCard("Immunization Status",simpleDistribution(immunStatus),"Child immunization rows")}
       ${profileCard("PhilHealth Member Types",simpleDistribution(phil),"Recorded member rows")}
-      ${profileCard("Top Reported Illnesses",simpleDistribution(illnesses,10),`${illnessRows.length} illness row(s)`)}
+      ${profileCard("Top Reported Illnesses",simpleDistribution(illnesses),`${illnessRows.length} illness row(s)`)}
       ${profileCard("Illness Records by Age × Illness",illnessByAge(),"Top combinations")}
       ${profileCard("Illness Records by Sex",simpleDistribution(illnessSex),"Rows with sex recorded")}
-      ${profileCard("Reported Causes of Death",simpleDistribution(causes,8),`${deathRows.length} death row(s)`)}
+      ${profileCard("Reported Causes of Death",simpleDistribution(causes),`${deathRows.length} death row(s)`)}
     </div>
     <div class="profile-grid three" style="margin-top:7px">${vitalsProfileCards()}</div>
     <div class="profile-note"><strong>Health graphs are descriptive.</strong> Vital-sign charts summarize recorded measurements and do not assign clinical diagnoses.</div>`;
@@ -1052,17 +1163,17 @@ AAApp.context().then(async ctx=>{
     const projects=topValues("community_projects_participated");
 
     return `<div class="profile-grid three">
-      ${profileCard("Family Income",renderBars(counts(income),answeredCount(income),10),"Household income bracket")}
-      ${profileCard("Livelihood",renderBars(counts(livelihood,{multi:true}),livelihood.filter(v=>Array.isArray(v)&&v.length).length,10),"Multiple responses allowed")}
-      ${profileCard("Educational Attainment",simpleDistribution(education,10),"Profiled members")}
-      ${profileCard("Drinking Water Source",renderBars(counts(water),answeredCount(water),10),"Households")}
-      ${profileCard("Water Treatment",renderBars(counts(treatment),answeredCount(treatment),10),"Households")}
+      ${profileCard("Family Income",renderBars(counts(income),answeredCount(income)),"Household income bracket")}
+      ${profileCard("Livelihood",renderBars(counts(livelihood,{multi:true}),livelihood.filter(v=>Array.isArray(v)&&v.length).length),"Multiple responses allowed")}
+      ${profileCard("Educational Attainment",simpleDistribution(education),"Profiled members")}
+      ${profileCard("Drinking Water Source",renderBars(counts(water),answeredCount(water)),"Households")}
+      ${profileCard("Water Treatment",renderBars(counts(treatment),answeredCount(treatment)),"Households")}
       ${yesNoMini("Households with Toilet",toilet)}
-      ${profileCard("Toilet Type",renderBars(counts(toiletType),answeredCount(toiletType),10),"Answered households")}
-      ${profileCard("Garbage Disposal",renderBars(counts(garbage,{multi:true}),garbage.filter(v=>Array.isArray(v)&&v.length).length,10),"Multiple responses allowed")}
+      ${profileCard("Toilet Type",renderBars(counts(toiletType),answeredCount(toiletType)),"Answered households")}
+      ${profileCard("Garbage Disposal",renderBars(counts(garbage,{multi:true}),garbage.filter(v=>Array.isArray(v)&&v.length).length),"Multiple responses allowed")}
       ${yesNoMini("Animals in Household",animals)}
       ${yesNoMini("Organization Involvement",org)}
-      ${profileCard("Community Projects Mentioned",simpleDistribution(projects,8),"Free-text responses")}
+      ${profileCard("Community Projects Mentioned",simpleDistribution(projects),"Free-text responses")}
       ${profileCard("Top Community Problems",topCommunityProblems(),"From Problems & Recommendations")}
       ${profileCard("Zone Comparison",zoneComparison(),"Toilet, water treatment, and organization involvement",true)}
     </div>
@@ -1082,6 +1193,7 @@ AAApp.context().then(async ctx=>{
     else if(activeProfileTab==="health")target.innerHTML=healthProfile();
     else if(activeProfileTab==="community")target.innerHTML=communityProfile();
     else target.innerHTML=overviewProfile();
+    target.insertAdjacentHTML("beforeend",`<div class="data-cleaning-note"><strong>Response cleaning:</strong> equivalent entries are grouped after normalizing capitalization, punctuation, spacing, common abbreviations, simple singular/plural differences, and very close spelling variants. Hover a bar on desktop to see combined raw variants when applicable.</div>`);
   }
 
   function renderOverview(){

@@ -215,3 +215,18 @@
 .graph-download-button.apa-ready{
   font-family:"Times New Roman", Times, serif;
 }
+
+
+/* v17 — all categories + cleaned response grouping */
+.bar-chart.all-categories{gap:6px}
+.bar-chart.all-categories .bar-label{overflow:visible;white-space:normal}
+.data-cleaning-note{
+  margin-top:6px;
+  padding:6px 8px;
+  border-left:2px solid #777;
+  background:#fafafa;
+  font-family:"Times New Roman", Times, serif;
+  font-size:7px;
+  line-height:1.35;
+  color:#444;
+}
