@@ -1,6 +1,6 @@
-# Alang-Alang Community Profile Dashboard v14
+# Alang-Alang APA Paper Graphs v16
 
-This patch builds on Full Questionnaire Analytics v13 and adds collated, population-level visuals for community diagnosis.
+Builds on Downloadable Graphs v15.
 
 ## Replace
 - `diagnosis.html`
@@ -9,63 +9,38 @@ This patch builds on Full Questionnaire Analytics v13 and adds collated, populat
 
 ## No SQL needed
 
-## New Community Profile tabs
+## APA / formal paper export
+Every graph/card download is now formatted for manuscript use:
+- Times New Roman
+- white background
+- black / grayscale visual treatment
+- minimal decorative borders
+- high-resolution 3× PNG export
+- SVG fallback if PNG export is blocked by the browser
+- direct identifiers remain hidden
 
-### Overview
-- total profiled population
-- average household size
-- under-5 population
-- older adults
-- currently pregnant members
-- derived dependency ratio
+The live dashboard can still use its normal UI colors. The APA styling is applied to the downloaded image only.
+
+## Recommended APA 7 figure formatting in Word / Google Docs
+Place these as editable text outside the image:
+
+**Figure 1**  
+*Age and Sex Distribution of Surveyed Household Members*
+
+[insert exported graph]
+
+*Note.* Percentages are based on nonmissing responses. Replace or expand the note as needed.
+
+Use figure numbers in the order figures first appear in your paper. Do not rely on an image-baked figure number because you may reorder the figures during writing.
+
+## Existing features retained
+- Community Profile views
 - population pyramid
-- age structure
-- household-size distribution
-- family-income profile
-- top reported illnesses
-
-### Population
-- population pyramid (age × sex)
-- age-group distribution
-- sex distribution
-- civil status × age group matrix
-- educational attainment × age group matrix
-- common occupations
-- young / working-age / older population counts
-- derived dependency ratio
-
-### Health
-- adults, under-5s, under-2s and pregnant-member counts
-- breastfeeding
-- supplementary feeding
-- child weight and height status
-- immunization status
-- PhilHealth member types
-- top illnesses
-- illness age-patterns
-- illness by sex
-- reported causes of death
-- adult-vital histograms and summary statistics
-
-### Environment & Community
-- family income
-- livelihood
-- education
-- drinking-water source
-- water treatment
-- toilet coverage/type
-- garbage disposal
-- animals in households
-- organization involvement
-- community projects
-- top community problems
-- zone comparison for toilet, water treatment and organization involvement
-
-The complete field-by-field questionnaire analytics from v13 remain below the Community Profile.
-
-## Notes
-- Population estimates use the household head + family members actually entered in the survey.
-- Missing members are not imputed.
-- Percentages use answered responses.
-- Vital-sign graphs are descriptive only and do not automatically diagnose disease.
-- Open the page online once after upload so the browser/service worker can cache the updated files.
+- demographic matrices
+- health analytics
+- environmental/community analytics
+- full field-by-field questionnaire analytics
+- filters
+- Summary CSV
+- Print
+- notes and priority scoring

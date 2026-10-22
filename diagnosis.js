@@ -143,6 +143,206 @@ AAApp.context().then(async ctx=>{
   function fmt(n,d=1){
     return n===null||n===undefined||Number.isNaN(n)?"—":Number(n).toLocaleString(undefined,{maximumFractionDigits:d});
   }
+
+  function exportSlug(v){
+    return normalize(v||"graph").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"").slice(0,80)||"graph";
+  }
+
+  function exportToast(message){
+    document.querySelector(".export-toast")?.remove();
+    const el=document.createElement("div");
+    el.className="export-toast";
+    el.textContent=message;
+    document.body.appendChild(el);
+    setTimeout(()=>el.remove(),1800);
+  }
+
+  function inlineStyles(source,clone){
+    const src=[source,...source.querySelectorAll("*")];
+    const dst=[clone,...clone.querySelectorAll("*")];
+    for(let i=0;i<Math.min(src.length,dst.length);i++){
+      const cs=getComputedStyle(src[i]);
+      let css="";
+      for(const prop of cs)css+=`${prop}:${cs.getPropertyValue(prop)};`;
+      dst[i].setAttribute("style",css);
+    }
+  }
+
+
+  function applyApaExportStyles(root){
+    const all=[root,...root.querySelectorAll("*")];
+
+    all.forEach(el=>{
+      el.style.fontFamily='"Times New Roman", Times, serif';
+      el.style.boxShadow="none";
+      el.style.textShadow="none";
+    });
+
+    root.style.background="#ffffff";
+    root.style.color="#000000";
+    root.style.border="0";
+    root.style.borderRadius="0";
+
+    root.querySelectorAll(".profile-card,.question-card,.metric-card,.kpi-card,.profile-kpi").forEach(el=>{
+      el.style.background="#ffffff";
+      el.style.color="#000000";
+      el.style.border="0";
+      el.style.borderRadius="0";
+      el.style.padding="8px";
+    });
+
+    root.querySelectorAll("h1,h2,h3,strong,b,.bar-label,.age-band,.zone-name").forEach(el=>{
+      el.style.color="#000000";
+    });
+
+    root.querySelectorAll(".field-code,.question-sub,.profile-sub,.text-note,.more-note,small,.bar-value,.pyramid-footer,.profile-note").forEach(el=>{
+      el.style.color="#444444";
+    });
+
+    root.querySelectorAll(".bar-track,.progress-track,.pyramid-side").forEach(el=>{
+      el.style.background="#eeeeee";
+      el.style.borderRadius="0";
+    });
+
+    root.querySelectorAll(".bar-track i,.progress-track i,.hist-bin i").forEach(el=>{
+      el.style.background="#555555";
+      el.style.borderRadius="0";
+    });
+
+    root.querySelectorAll(".pyramid-side.male i").forEach(el=>{
+      el.style.background="#333333";
+      el.style.color="#ffffff";
+    });
+    root.querySelectorAll(".pyramid-side.female i").forEach(el=>{
+      el.style.background="#888888";
+      el.style.color="#ffffff";
+    });
+
+    root.querySelectorAll(".donut").forEach(el=>{
+      const angle=el.style.getPropertyValue("--donut-angle")||"0deg";
+      el.style.background=`conic-gradient(#444444 0deg ${angle}, #dddddd ${angle} 360deg)`;
+    });
+    root.querySelectorAll(".donut:after").forEach(()=>{});
+
+    root.querySelectorAll(".profile-matrix td").forEach(el=>{
+      const text=normalize(el.textContent);
+      el.style.background=text==="—" ? "#ffffff" : "#eeeeee";
+      el.style.color="#000000";
+      el.style.border="1px solid #cccccc";
+      el.style.borderRadius="0";
+    });
+    root.querySelectorAll(".profile-matrix th").forEach(el=>{
+      el.style.background="#ffffff";
+      el.style.color="#000000";
+    });
+
+    root.querySelectorAll(".identifier-box,.no-data-box,.profile-note").forEach(el=>{
+      el.style.background="#ffffff";
+      el.style.border="1px solid #cccccc";
+      el.style.borderRadius="0";
+    });
+
+    root.querySelectorAll(".pill").forEach(el=>{
+      el.style.background="#ffffff";
+      el.style.color="#000000";
+      el.style.border="1px solid #777777";
+    });
+
+    // Hide UI-only elements from publication export.
+    root.querySelectorAll(".card-download-wrap,.graph-download-button,.profile-tabs,.analytics-actions,.analytics-nav").forEach(el=>el.remove());
+
+    // Slightly larger paper-readable typography.
+    root.querySelectorAll("h3").forEach(el=>el.style.fontSize="13px");
+    root.querySelectorAll(".bar-label,.bar-value,.question-sub,.profile-sub").forEach(el=>el.style.fontSize="8px");
+  }
+
+  function buildExportSvg(element){
+    const rect=element.getBoundingClientRect();
+    const width=Math.max(320,Math.ceil(rect.width));
+    const clone=element.cloneNode(true);
+    clone.classList.add("export-clone");
+    clone.querySelectorAll(".card-download-wrap,.graph-download-button").forEach(x=>x.remove());
+    inlineStyles(element,clone);
+    applyApaExportStyles(clone);
+    clone.style.width=`${width}px`;
+    clone.style.maxWidth="none";
+    clone.style.margin="0";
+    clone.style.background="#ffffff";
+    const wrap=document.createElement("div");
+    wrap.setAttribute("xmlns","http://www.w3.org/1999/xhtml");
+    wrap.style.width=`${width}px`;
+    wrap.style.background="#ffffff";
+    wrap.appendChild(clone);
+    const html=new XMLSerializer().serializeToString(wrap);
+    const height=Math.max(180,Math.ceil(rect.height)+12);
+    const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${width+32}" height="${height+32}">
+      <rect width="100%" height="100%" fill="#ffffff"/>
+      <foreignObject x="16" y="16" width="${width}" height="${height}">${html}</foreignObject>
+    </svg>`;
+    return {svg,width:width+32,height:height+32};
+  }
+
+  async function downloadGraphImage(element,title){
+    const {svg,width,height}=buildExportSvg(element);
+    const blob=new Blob([svg],{type:"image/svg+xml;charset=utf-8"});
+    const url=URL.createObjectURL(blob);
+    try{
+      const img=new Image();
+      await new Promise((resolve,reject)=>{
+        img.onload=resolve; img.onerror=reject; img.src=url;
+      });
+      const scale=3;
+      const canvas=document.createElement("canvas");
+      canvas.width=Math.round(width*scale);
+      canvas.height=Math.round(height*scale);
+      const c=canvas.getContext("2d");
+      c.scale(scale,scale);
+      c.fillStyle="#fff"; c.fillRect(0,0,width,height);
+      c.drawImage(img,0,0,width,height);
+      const png=await new Promise(resolve=>canvas.toBlob(resolve,"image/png",0.95));
+      if(!png)throw new Error("PNG unavailable");
+      const pngUrl=URL.createObjectURL(png);
+      const a=document.createElement("a");
+      a.href=pngUrl;
+      a.download=`${exportSlug(title)}-apa-tnr.png`;
+      document.body.appendChild(a);a.click();a.remove();
+      setTimeout(()=>URL.revokeObjectURL(pngUrl),1000);
+      exportToast("APA/TNR graph downloaded");
+    }catch(err){
+      const a=document.createElement("a");
+      a.href=url;
+      a.download=`${exportSlug(title)}-apa-tnr.svg`;
+      document.body.appendChild(a);a.click();a.remove();
+      exportToast("APA/TNR graph downloaded as SVG");
+    }finally{
+      setTimeout(()=>URL.revokeObjectURL(url),1200);
+    }
+  }
+
+  function attachDownloadButtons(root=document){
+    root.querySelectorAll(".profile-card,.question-card").forEach((card,index)=>{
+      if(card.querySelector(":scope > .card-download-wrap"))return;
+      const title=card.querySelector("h3")?.textContent?.trim()||`graph-${index+1}`;
+      const wrap=document.createElement("div");
+      wrap.className="card-download-wrap";
+      const btn=document.createElement("button");
+      btn.type="button";
+      btn.className="card-download-button";
+      btn.textContent="↓ APA PNG";
+      btn.addEventListener("click",async e=>{
+        e.stopPropagation();
+        btn.disabled=true;
+        const old=btn.textContent;
+        btn.textContent="Saving…";
+        try{await downloadGraphImage(card,`alang-alang-${title}`);}
+        catch(err){console.error(err);alert("Could not export this graph in this browser.");}
+        finally{btn.disabled=false;btn.textContent=old;}
+      });
+      wrap.appendChild(btn);
+      card.appendChild(wrap);
+    });
+  }
+
   function fieldLabel(path){
     const parts=path.split(".");
     const field=parts[parts.length-1];
@@ -920,6 +1120,7 @@ AAApp.context().then(async ctx=>{
     renderProfileDashboard();
     renderCompleteness();
     renderSections();
+    attachDownloadButtons(document);
   }
 
   function applyQuestionSearch(){
@@ -1034,7 +1235,24 @@ AAApp.context().then(async ctx=>{
       activeProfileTab=btn.dataset.profileTab||"overview";
       document.querySelectorAll("[data-profile-tab]").forEach(x=>x.classList.toggle("active",x===btn));
       renderProfileDashboard();
+      attachDownloadButtons(document.getElementById("profile-dashboard"));
     });
+  });
+
+  document.getElementById("download-profile-svg")?.addEventListener("click",async()=>{
+    const btn=document.getElementById("download-profile-svg");
+    btn.disabled=true;
+    const old=btn.textContent;
+    btn.textContent="Saving…";
+    try{
+      await downloadGraphImage(document.getElementById("profile-dashboard"),`alang-alang-community-profile-${activeProfileTab}`);
+    }catch(err){
+      console.error(err);
+      alert("Could not export the Community Profile in this browser.");
+    }finally{
+      btn.disabled=false;
+      btn.textContent=old;
+    }
   });
 
   ["filter-barangay","filter-zone","filter-interviewer","filter-encoder","filter-from","filter-to"]

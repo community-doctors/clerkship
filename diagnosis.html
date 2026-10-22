@@ -9,7 +9,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="styles.css?v=3">
   <link rel="stylesheet" href="compact-ui.css?v=7">
-  <link rel="stylesheet" href="diagnosis-analytics.css?v=14">
+  <link rel="stylesheet" href="diagnosis-analytics.css?v=16">
   <style id="aa-hidden-safety">
     [hidden], .app-loading[hidden], #app-loading[hidden] {
       display:none!important;
@@ -80,7 +80,10 @@
             <h2>Community Profile</h2>
             <small>Population-based visuals derived from the household survey</small>
           </div>
-          <span id="profile-sample-note" class="pill">—</span>
+          <div class="profile-head-actions">
+            <button id="download-profile-svg" type="button" class="graph-download-button">↓ Download APA profile</button>
+            <span id="profile-sample-note" class="pill">—</span>
+          </div>
         </div>
 
         <div class="profile-tabs" role="tablist" aria-label="Community profile views">
@@ -146,6 +149,6 @@
   <script src="supabase-config.js"></script>
   <script src="offline-db.js?v=5"></script>
   <script src="app-common.js?v=10"></script>
-  <script src="diagnosis.js?v=14"></script>
+  <script src="diagnosis.js?v=16"></script>
 </body>
 </html>
