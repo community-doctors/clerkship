@@ -1,41 +1,58 @@
-# Alang-Alang Cleaned All-Categories Analytics v17
+# Alang-Alang Cross-Matched & Audited Analytics v18
 
-Builds on APA Paper Graphs v16.
+Builds on v17.
 
 ## Replace
-- `diagnosis.html`
-- `diagnosis.js`
-- `diagnosis-analytics.css`
+- diagnosis.html
+- diagnosis.js
+- diagnosis-analytics.css
 
 ## No SQL needed
 
-## New data cleaning
-Equivalent responses are automatically grouped before graphing:
-- capitalization differences
-- extra spaces
-- punctuation / hyphen differences
-- common singular/plural variants
-- conservative close-spelling typo matching
-- selected common health abbreviations and synonyms, e.g.:
-  - HTN / hypertension / hypertensive / high blood pressure → Hypertension
-  - DM / diabetes / diabetes mellitus → Diabetes mellitus
-  - UTI → Urinary tract infection
-  - URI / URTI → Upper respiratory tract infection
-  - PTB / TB / tuberculosis → Tuberculosis
-  - diarrhoea / diarrhea → Diarrhea
+## Why the old counts could differ
+The old Age Structure counted every member with a known age, while the Population Pyramid
+counted only members whose sex was exactly Male or Female. A child with known age but missing
+or nonstandard sex could therefore appear in the age graph but disappear from the pyramid.
 
-The original survey records are NOT changed. Cleaning happens only for analytics display/export.
+## v18 fixes
 
-## All categories shown
-Categorical, free-text frequency, illness, occupation, problem, environmental, and other frequency graphs now show ALL detected categories instead of only Top 8 / Top 10 / Top 12.
+### One canonical population dataset
+All population-level graphs now use the same deduplicated household-member list.
 
-Matrices such as education × age and civil status × age also show all detected columns.
+Age source:
+1. Birthdate calculated at the interview date, when available.
+2. Entered age only as fallback.
 
-## APA export retained
-- Times New Roman
-- grayscale/black
-- white background
-- high-resolution PNG
-- SVG fallback
-- download per graph/card
-- download current Community Profile view
+### Population Pyramid
+- The center of every row now shows the TOTAL for that age band.
+- Male and Female remain on the two sides.
+- Other/unknown sex is explicitly shown instead of silently excluded.
+- Footer shows male, female, other/not stated, and total known-age population.
+
+### Duplicate handling
+Conservative duplicate removal is applied within each household when the same person appears
+both as household head and as a repeated household member, or when an exact member identity
+is repeated.
+
+### Data Audit tab
+Automatically cross-checks:
+- total population vs sex-category total
+- known-age population vs all age-band totals
+- Under 5 vs `<1 + 1–4`
+- Age <15 vs pediatric age bands
+- dependency groups vs known-age population
+- household profile-size sum vs population total
+
+Also reports:
+- missing age
+- missing sex
+- birthdate vs entered-age conflicts
+- invalid ages
+- duplicate profile rows removed
+
+## Important
+The audit verifies internal consistency of the app's derived counts. It cannot determine whether
+a survey response was factually entered correctly in the field; that still requires checking the
+source questionnaire/raw record.
+
+APA/TNR exports and all-category graphs from v17 are retained.

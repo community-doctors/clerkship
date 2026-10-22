@@ -230,3 +230,34 @@
   line-height:1.35;
   color:#444;
 }
+
+
+/* v18 — population reconciliation + audit */
+.age-band{display:grid!important;place-items:center;line-height:1.05}
+.age-band b{font:700 9px "Times New Roman", Times, serif;color:#111}
+.age-band em{font-style:normal;font-size:6.5px;color:#555}
+.age-band small{font-size:5.3px;color:#777;white-space:nowrap}
+.audit-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-bottom:8px}
+.audit-stat{padding:8px;border:1px solid #ddd;border-radius:8px;background:#fff;display:grid;gap:2px}
+.audit-stat span{font-size:6px;text-transform:uppercase;color:#666;font-weight:700}
+.audit-stat strong{font:700 16px "Times New Roman", Times, serif;color:#111}
+.audit-stat small{font-size:6px;color:#666}
+.audit-list{display:grid;gap:6px}
+.audit-row{display:grid;grid-template-columns:22px minmax(150px,1.4fr) minmax(100px,1fr);gap:8px;align-items:start;padding:8px;border:1px solid #ddd;background:#fff}
+.audit-icon{font:700 12px "Times New Roman", Times, serif;text-align:center}
+.audit-row.pass .audit-icon{color:#255d39}
+.audit-row.warn .audit-icon{color:#8a5b00}
+.audit-row.fail .audit-icon{color:#8a1c1c}
+.audit-row strong{display:block;font:700 10px "Times New Roman", Times, serif;color:#111}
+.audit-row p{margin:2px 0 0;font:400 7.5px/1.35 "Times New Roman", Times, serif;color:#444}
+.audit-values{font:400 7px/1.35 "Times New Roman", Times, serif;color:#555;text-align:right}
+.audit-table{width:100%;border-collapse:collapse;font:400 7.5px "Times New Roman", Times, serif}
+.audit-table th,.audit-table td{padding:5px 6px;border:1px solid #ccc;text-align:left}
+.audit-table th{background:#f3f3f3;font-weight:700}
+.audit-table td.num{text-align:right}
+.audit-note{margin-top:7px;padding:7px 8px;border:1px solid #ccc;background:#fff;font:400 7.5px/1.4 "Times New Roman", Times, serif;color:#333}
+@media(max-width:760px){
+  .audit-summary{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .audit-row{grid-template-columns:20px 1fr}
+  .audit-values{grid-column:2;text-align:left}
+}

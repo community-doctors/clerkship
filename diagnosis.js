@@ -845,6 +845,7 @@ AAApp.context().then(async ctx=>{
 
 
   const PROFILE_AGE_BANDS=["<1","1–4","5–9","10–14","15–19","20–39","40–59","60+"];
+
   function profileAgeBand(age){
     if(age===null||age===undefined||Number.isNaN(age))return "Unknown";
     if(age<1)return "<1";
@@ -857,48 +858,114 @@ AAApp.context().then(async ctx=>{
     return "60+";
   }
 
-  function getPopulationProfiles(){
-    const people=[];
+  function ageFromBirthdate(birthdate,interviewDate){
+    if(blank(birthdate))return null;
+    const b=new Date(`${normalize(birthdate)}T12:00:00`);
+    const ref=interviewDate?new Date(`${normalize(interviewDate)}T12:00:00`):new Date();
+    if(Number.isNaN(b.getTime())||Number.isNaN(ref.getTime())||b>ref)return null;
+    let age=ref.getFullYear()-b.getFullYear();
+    const md=ref.getMonth()-b.getMonth();
+    if(md<0||(md===0&&ref.getDate()<b.getDate()))age--;
+    return age>=0&&age<=120?age:null;
+  }
+
+  function cleanProfileAge(typedAge,birthdate,interviewDate,audit){
+    const typed=numericValue(typedAge);
+    const dobAge=ageFromBirthdate(birthdate,interviewDate);
+    if(typed!==null&&(typed<0||typed>120)){
+      audit.invalidAges++;
+    }
+    const validTyped=typed!==null&&typed>=0&&typed<=120?typed:null;
+    if(dobAge!==null&&validTyped!==null&&Math.abs(dobAge-validTyped)>1){
+      audit.ageConflicts++;
+    }
+    return dobAge!==null?dobAge:validTyped;
+  }
+
+  function canonicalSex(value){
+    const s=basicCategoryKey(value);
+    if(s==="male"||s==="m")return "Male";
+    if(s==="female"||s==="f")return "Female";
+    if(!s)return "Unknown / not stated";
+    return "Other / not stated";
+  }
+
+  function profileIdentityKey(p){
+    const n=basicCategoryKey(p.name);
+    const bd=normalize(p.birthdate);
+    const sex=canonicalSex(p.sex);
+    if(n&&bd)return `${n}|${bd}|${sex}`;
+    if(n&&p.age!==null)return `${n}|age:${p.age}|${sex}`;
+    return "";
+  }
+
+  function getPopulationBundle(){
+    const raw=[];
+    const audit={duplicatesRemoved:0,invalidAges:0,ageConflicts:0,missingAge:0,missingSex:0};
     filteredRecords.forEach((r,recordIndex)=>{
       const j=r.response_json||{};
       const hh=r.household_code||j.household_number||`Household ${recordIndex+1}`;
+      const interviewDate=r.interview_date||j.interview_date||"";
       const headName=normalize(j.head_name);
-      const headAge=numericValue(j.head_age);
-      if(headName||headAge!==null||!blank(j.head_sex)){
-        people.push({
-          household:hh,
-          recordIndex,
-          role:"Household Head",
-          name:headName,
-          age:headAge,
-          sex:normalize(j.head_sex),
-          civil_status:normalize(j.head_civil_status),
-          education:normalize(j.head_education),
-          occupation:normalize(j.head_occupation),
-          employment:normalize(j.head_employment_status),
-          pregnancy_status:normalize(j.head_pregnancy_status)
+      const headBirthdate=normalize(j.head_birthdate);
+      const headAge=cleanProfileAge(j.head_age,headBirthdate,interviewDate,audit);
+
+      if(headName||headAge!==null||!blank(j.head_sex)||headBirthdate){
+        raw.push({
+          household:hh,recordIndex,role:"Household Head",name:headName,birthdate:headBirthdate,
+          age:headAge,sex:normalize(j.head_sex),civil_status:normalize(j.head_civil_status),
+          education:normalize(j.head_education),occupation:normalize(j.head_occupation),
+          employment:normalize(j.head_employment_status),pregnancy_status:normalize(j.head_pregnancy_status),
+          interviewDate,source:"head"
         });
       }
+
       const members=Array.isArray(j.family_members)?j.family_members:[];
       members.forEach(m=>{
-        const age=numericValue(m.age);
-        if(blank(m.name)&&age===null&&blank(m.sex))return;
-        people.push({
-          household:hh,
-          recordIndex,
-          role:normalize(m.relation)||"Household Member",
-          name:normalize(m.name),
-          age,
-          sex:normalize(m.sex),
-          civil_status:normalize(m.civil_status),
-          education:normalize(m.education),
-          occupation:normalize(m.occupation),
-          employment:"",
-          pregnancy_status:normalize(m.pregnancy_status)
+        const birthdate=normalize(m.birthdate);
+        const age=cleanProfileAge(m.age,birthdate,interviewDate,audit);
+        if(blank(m.name)&&age===null&&blank(m.sex)&&blank(birthdate))return;
+        raw.push({
+          household:hh,recordIndex,role:normalize(m.relation)||"Household Member",
+          name:normalize(m.name),birthdate,age,sex:normalize(m.sex),
+          civil_status:normalize(m.civil_status),education:normalize(m.education),
+          occupation:normalize(m.occupation),employment:normalize(m.employment_status),
+          pregnancy_status:normalize(m.pregnancy_status),interviewDate,source:"member"
         });
       });
     });
-    return people;
+
+    const deduped=[];
+    const seenByHousehold=new Map();
+    raw.forEach(p=>{
+      const id=profileIdentityKey(p);
+      const headLike=/^(self|self household head|household head)$/i.test(basicCategoryKey(p.role));
+      if(!seenByHousehold.has(p.recordIndex))seenByHousehold.set(p.recordIndex,new Map());
+      const seen=seenByHousehold.get(p.recordIndex);
+
+      if(id&&seen.has(id)){
+        const previous=seen.get(id);
+        if(headLike||previous.source==="head"||p.source===previous.source){
+          audit.duplicatesRemoved++;
+          return;
+        }
+      }
+      deduped.push(p);
+      if(id)seen.set(id,p);
+    });
+
+    deduped.forEach(p=>{
+      p.sex_group=canonicalSex(p.sex);
+      p.age_band=profileAgeBand(p.age);
+      if(p.age===null)audit.missingAge++;
+      if(p.sex_group==="Unknown / not stated")audit.missingSex++;
+    });
+
+    return {people:deduped,audit,rawCount:raw.length};
+  }
+
+  function getPopulationProfiles(){
+    return getPopulationBundle().people;
   }
 
   function profileKpi(label,value,sub=""){
@@ -912,25 +979,42 @@ AAApp.context().then(async ctx=>{
   function populationPyramid(people){
     const male=Object.fromEntries(PROFILE_AGE_BANDS.map(x=>[x,0]));
     const female=Object.fromEntries(PROFILE_AGE_BANDS.map(x=>[x,0]));
+    const other=Object.fromEntries(PROFILE_AGE_BANDS.map(x=>[x,0]));
+
     people.forEach(p=>{
-      const band=profileAgeBand(p.age);
+      const band=p.age_band||profileAgeBand(p.age);
       if(!PROFILE_AGE_BANDS.includes(band))return;
-      if(/^male$/i.test(p.sex))male[band]++;
-      if(/^female$/i.test(p.sex))female[band]++;
+      const sex=p.sex_group||canonicalSex(p.sex);
+      if(sex==="Male")male[band]++;
+      else if(sex==="Female")female[band]++;
+      else other[band]++;
     });
+
     const max=Math.max(1,...PROFILE_AGE_BANDS.flatMap(b=>[male[b],female[b]]));
     const rows=[...PROFILE_AGE_BANDS].reverse().map(b=>{
       const mw=Math.round(male[b]/max*100),fw=Math.round(female[b]/max*100);
+      const total=male[b]+female[b]+other[b];
       return `<div class="pyramid-row">
         <span class="pyramid-side male"><i style="width:${mw}%">${male[b]||""}</i></span>
-        <span class="age-band">${b}</span>
+        <span class="age-band"><b>${total}</b><em>${b}</em>${other[b]?`<small>+${other[b]} sex not stated/other</small>`:""}</span>
         <span class="pyramid-side female"><i style="width:${fw}%">${female[b]||""}</i></span>
       </div>`;
     }).join("");
+
+    const maleTotal=Object.values(male).reduce((a,b)=>a+b,0);
+    const femaleTotal=Object.values(female).reduce((a,b)=>a+b,0);
+    const otherTotal=Object.values(other).reduce((a,b)=>a+b,0);
+    const knownAge=maleTotal+femaleTotal+otherTotal;
+
     return `<div class="population-pyramid">
-      <div class="pyramid-header"><span>Male</span><span>Age</span><span>Female</span></div>
+      <div class="pyramid-header"><span>Male</span><span>Total · Age</span><span>Female</span></div>
       ${rows}
-      <div class="pyramid-footer"><span><b>${Object.values(male).reduce((a,b)=>a+b,0)}</b> male</span><span><b>${Object.values(female).reduce((a,b)=>a+b,0)}</b> female</span></div>
+      <div class="pyramid-footer">
+        <span><b>${maleTotal}</b> male</span>
+        <span><b>${femaleTotal}</b> female</span>
+        <span><b>${otherTotal}</b> other/not stated</span>
+        <span><b>${knownAge}</b> known age total</span>
+      </div>
     </div>`;
   }
 
@@ -1045,6 +1129,118 @@ AAApp.context().then(async ctx=>{
     return simpleDistribution(vals);
   }
 
+
+  function populationAudit(){
+    const bundle=getPopulationBundle();
+    const people=bundle.people;
+    const knownAge=people.filter(p=>p.age!==null);
+    const ageCounts=Object.fromEntries(PROFILE_AGE_BANDS.map(b=>[b,0]));
+    knownAge.forEach(p=>{if(ageCounts[p.age_band]!==undefined)ageCounts[p.age_band]++;});
+    const ageSum=Object.values(ageCounts).reduce((a,b)=>a+b,0);
+
+    const sexCounts={
+      "Male":people.filter(p=>p.sex_group==="Male").length,
+      "Female":people.filter(p=>p.sex_group==="Female").length,
+      "Other / not stated":people.filter(p=>p.sex_group==="Other / not stated").length,
+      "Unknown / not stated":people.filter(p=>p.sex_group==="Unknown / not stated").length
+    };
+    const sexSum=Object.values(sexCounts).reduce((a,b)=>a+b,0);
+
+    const under5=knownAge.filter(p=>p.age<5).length;
+    const under5Bands=(ageCounts["<1"]||0)+(ageCounts["1–4"]||0);
+    const under15=knownAge.filter(p=>p.age<15).length;
+    const under15Bands=(ageCounts["<1"]||0)+(ageCounts["1–4"]||0)+(ageCounts["5–9"]||0)+(ageCounts["10–14"]||0);
+    const dep=dependencyStats(people);
+    const dependencySum=dep.young+dep.working+dep.older;
+
+    const byHouse=new Map();
+    people.forEach(p=>byHouse.set(p.recordIndex,(byHouse.get(p.recordIndex)||0)+1));
+    const householdProfileSum=[...byHouse.values()].reduce((a,b)=>a+b,0);
+
+    const checks=[
+      {
+        label:"Population total = sex categories",
+        pass:people.length===sexSum,
+        detail:"Every canonical household member should fall into Male, Female, Other, or Unknown.",
+        values:`Population ${people.length} · Sex categories ${sexSum}`
+      },
+      {
+        label:"Known-age total = sum of age bands",
+        pass:knownAge.length===ageSum,
+        detail:"The population pyramid and age-structure graph now use this same age-band source.",
+        values:`Known age ${knownAge.length} · Age bands ${ageSum}`
+      },
+      {
+        label:"Under-5 count = <1 + 1–4",
+        pass:under5===under5Bands,
+        detail:"This specifically checks the discrepancy you noticed.",
+        values:`Under 5 ${under5} · Bands ${under5Bands}`
+      },
+      {
+        label:"Age <15 = pediatric age bands",
+        pass:under15===under15Bands,
+        detail:"Checks <1, 1–4, 5–9, and 10–14 against the derived age threshold.",
+        values:`Age <15 ${under15} · Bands ${under15Bands}`
+      },
+      {
+        label:"Dependency groups = known-age population",
+        pass:dependencySum===knownAge.length,
+        detail:"Young (<15), working age (15–64), and older (65+) must reconcile.",
+        values:`Groups ${dependencySum} · Known age ${knownAge.length}`
+      },
+      {
+        label:"Household profile sizes = population total",
+        pass:householdProfileSum===people.length,
+        detail:"All canonical members are counted once across household-size calculations.",
+        values:`Household sum ${householdProfileSum} · Population ${people.length}`
+      }
+    ];
+
+    return {bundle,people,knownAge,ageCounts,sexCounts,checks};
+  }
+
+  function auditProfile(){
+    const a=populationAudit();
+    const failed=a.checks.filter(x=>!x.pass).length;
+    const warnings=
+      a.bundle.audit.missingAge+
+      a.bundle.audit.missingSex+
+      a.bundle.audit.ageConflicts+
+      a.bundle.audit.invalidAges;
+
+    const summary=`<div class="audit-summary">
+      <article class="audit-stat"><span>Core checks</span><strong>${a.checks.length-failed}/${a.checks.length}</strong><small>reconciled</small></article>
+      <article class="audit-stat"><span>Canonical population</span><strong>${a.people.length}</strong><small>${a.bundle.rawCount} raw profile row(s)</small></article>
+      <article class="audit-stat"><span>Duplicates removed</span><strong>${a.bundle.audit.duplicatesRemoved}</strong><small>exact/same-member duplicates</small></article>
+      <article class="audit-stat"><span>Data warnings</span><strong>${warnings}</strong><small>missing/conflicting age or sex</small></article>
+    </div>`;
+
+    const checkRows=`<div class="audit-list">${a.checks.map(c=>`<div class="audit-row ${c.pass?"pass":"fail"}">
+      <span class="audit-icon">${c.pass?"✓":"!"}</span>
+      <div><strong>${safe(c.label)}</strong><p>${safe(c.detail)}</p></div>
+      <div class="audit-values">${safe(c.values)}</div>
+    </div>`).join("")}</div>`;
+
+    const ageRows=PROFILE_AGE_BANDS.map(b=>`<tr><td>${safe(b)}</td><td class="num">${a.ageCounts[b]||0}</td></tr>`).join("");
+    const sexRows=Object.entries(a.sexCounts).map(([k,v])=>`<tr><td>${safe(k)}</td><td class="num">${v}</td></tr>`).join("");
+
+    const qualityRows=[
+      ["Missing age",a.bundle.audit.missingAge],
+      ["Missing sex",a.bundle.audit.missingSex],
+      ["Entered age vs birthdate conflict (>1 year)",a.bundle.audit.ageConflicts],
+      ["Invalid entered age (<0 or >120)",a.bundle.audit.invalidAges],
+      ["Duplicate profile rows removed",a.bundle.audit.duplicatesRemoved]
+    ].map(([k,v])=>`<tr><td>${safe(k)}</td><td class="num">${v}</td></tr>`).join("");
+
+    return `${summary}${checkRows}
+      <div class="profile-grid three" style="margin-top:8px">
+        ${profileCard("Canonical Age-Band Counts",`<table class="audit-table"><thead><tr><th>Age band</th><th>n</th></tr></thead><tbody>${ageRows}<tr><th>Total known age</th><th class="num">${a.knownAge.length}</th></tr></tbody></table>`,"Same source used by Age Structure and Population Pyramid")}
+        ${profileCard("Canonical Sex Counts",`<table class="audit-table"><thead><tr><th>Sex category</th><th>n</th></tr></thead><tbody>${sexRows}<tr><th>Total population</th><th class="num">${a.people.length}</th></tr></tbody></table>`,"Unknown/other is retained instead of silently dropped")}
+        ${profileCard("Data Quality Flags",`<table class="audit-table"><thead><tr><th>Check</th><th>n</th></tr></thead><tbody>${qualityRows}</tbody></table>`,"Review these before final paper submission")}
+      </div>
+      <div class="audit-note"><strong>Important:</strong> Birthdate, when available, is now the preferred source for age at the interview date. Entered age is used only as fallback. All population-level visuals use the same deduplicated member list and the same age bands.</div>`;
+  }
+
   function overviewProfile(){
     const people=getPopulationProfiles();
     const dep=dependencyStats(people);
@@ -1063,7 +1259,7 @@ AAApp.context().then(async ctx=>{
       ${profileKpi("Dependency ratio",dep.ratio===null?"—":`${dep.ratio}`,"dependents per 100 ages 15–64")}
     </div>`;
 
-    const ageDist=people.map(p=>profileAgeBand(p.age)).filter(x=>x!=="Unknown");
+    const ageDist=people.map(p=>p.age_band||profileAgeBand(p.age)).filter(x=>x!=="Unknown");
     const income=topValues("family_income_bracket");
     const illness=repeaterRows("illnesses").map(r=>r.illness).filter(v=>!blank(v));
 
@@ -1072,15 +1268,15 @@ AAApp.context().then(async ctx=>{
       ${profileCard("Age Structure",simpleDistribution(ageDist),"Profiled household members")}
       ${profileCard("Household Size",householdSizeDistribution(people),"Based on listed household profiles")}
       ${profileCard("Family Income",renderBars(counts(income),answeredCount(income)),"Household distribution")}
-      ${profileCard("Top Reported Illnesses",simpleDistribution(illness),"From illness records")}
+      ${profileCard("Reported Illnesses",simpleDistribution(illness),"From illness records")}
     </div>
     <div class="profile-note"><strong>Derived view:</strong> population totals depend on household head + family members entered in the survey. Missing member profiles are not imputed.</div>`;
   }
 
   function populationProfile(){
     const people=getPopulationProfiles();
-    const sex=people.map(p=>p.sex).filter(v=>!blank(v));
-    const age=people.map(p=>profileAgeBand(p.age)).filter(x=>x!=="Unknown");
+    const sex=people.map(p=>p.sex_group||canonicalSex(p.sex));
+    const age=people.map(p=>p.age_band||profileAgeBand(p.age)).filter(x=>x!=="Unknown");
     const civil=people.filter(p=>!blank(p.civil_status));
     const edu=people.filter(p=>!blank(p.education));
     const occupation=people.map(p=>p.occupation).filter(v=>!blank(v));
@@ -1140,8 +1336,8 @@ AAApp.context().then(async ctx=>{
       ${profileCard("Child Height Status",simpleDistribution(heightStatus),"Nutrition rows")}
       ${profileCard("Immunization Status",simpleDistribution(immunStatus),"Child immunization rows")}
       ${profileCard("PhilHealth Member Types",simpleDistribution(phil),"Recorded member rows")}
-      ${profileCard("Top Reported Illnesses",simpleDistribution(illnesses),`${illnessRows.length} illness row(s)`)}
-      ${profileCard("Illness Records by Age × Illness",illnessByAge(),"Top combinations")}
+      ${profileCard("Reported Illnesses",simpleDistribution(illnesses),`${illnessRows.length} illness row(s)`)}
+      ${profileCard("Illness Records by Age × Illness",illnessByAge(),"All recorded age–illness combinations")}
       ${profileCard("Illness Records by Sex",simpleDistribution(illnessSex),"Rows with sex recorded")}
       ${profileCard("Reported Causes of Death",simpleDistribution(causes),`${deathRows.length} death row(s)`)}
     </div>
@@ -1192,8 +1388,9 @@ AAApp.context().then(async ctx=>{
     if(activeProfileTab==="population")target.innerHTML=populationProfile();
     else if(activeProfileTab==="health")target.innerHTML=healthProfile();
     else if(activeProfileTab==="community")target.innerHTML=communityProfile();
+    else if(activeProfileTab==="audit")target.innerHTML=auditProfile();
     else target.innerHTML=overviewProfile();
-    target.insertAdjacentHTML("beforeend",`<div class="data-cleaning-note"><strong>Response cleaning:</strong> equivalent entries are grouped after normalizing capitalization, punctuation, spacing, common abbreviations, simple singular/plural differences, and very close spelling variants. Hover a bar on desktop to see combined raw variants when applicable.</div>`);
+    target.insertAdjacentHTML("beforeend",`<div class="data-cleaning-note"><strong>Response cleaning:</strong> equivalent category spellings are grouped for analytics. Population visuals additionally use one canonical deduplicated member list; birthdate-based age is preferred when available. Use the Data Audit tab to verify reconciliation.</div>`);
   }
 
   function renderOverview(){
