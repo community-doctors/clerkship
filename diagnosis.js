@@ -1,6 +1,7 @@
 AAApp.context().then(async ctx=>{
   let allRecords=[], filteredRecords=[], memberNames=new Map();
   let renderedQuestions=0;
+  let activeProfileTab="overview";
   const csvRows=[];
 
   const REPEATER_SECTION={
@@ -531,6 +532,358 @@ AAApp.context().then(async ctx=>{
     }).join("")||'<div class="empty">No completed surveys yet.</div>';
   }
 
+
+  const PROFILE_AGE_BANDS=["<1","1–4","5–9","10–14","15–19","20–39","40–59","60+"];
+  function profileAgeBand(age){
+    if(age===null||age===undefined||Number.isNaN(age))return "Unknown";
+    if(age<1)return "<1";
+    if(age<=4)return "1–4";
+    if(age<=9)return "5–9";
+    if(age<=14)return "10–14";
+    if(age<=19)return "15–19";
+    if(age<=39)return "20–39";
+    if(age<=59)return "40–59";
+    return "60+";
+  }
+
+  function getPopulationProfiles(){
+    const people=[];
+    filteredRecords.forEach((r,recordIndex)=>{
+      const j=r.response_json||{};
+      const hh=r.household_code||j.household_number||`Household ${recordIndex+1}`;
+      const headName=normalize(j.head_name);
+      const headAge=numericValue(j.head_age);
+      if(headName||headAge!==null||!blank(j.head_sex)){
+        people.push({
+          household:hh,
+          recordIndex,
+          role:"Household Head",
+          name:headName,
+          age:headAge,
+          sex:normalize(j.head_sex),
+          civil_status:normalize(j.head_civil_status),
+          education:normalize(j.head_education),
+          occupation:normalize(j.head_occupation),
+          employment:normalize(j.head_employment_status),
+          pregnancy_status:normalize(j.head_pregnancy_status)
+        });
+      }
+      const members=Array.isArray(j.family_members)?j.family_members:[];
+      members.forEach(m=>{
+        const age=numericValue(m.age);
+        if(blank(m.name)&&age===null&&blank(m.sex))return;
+        people.push({
+          household:hh,
+          recordIndex,
+          role:normalize(m.relation)||"Household Member",
+          name:normalize(m.name),
+          age,
+          sex:normalize(m.sex),
+          civil_status:normalize(m.civil_status),
+          education:normalize(m.education),
+          occupation:normalize(m.occupation),
+          employment:"",
+          pregnancy_status:normalize(m.pregnancy_status)
+        });
+      });
+    });
+    return people;
+  }
+
+  function profileKpi(label,value,sub=""){
+    return `<article class="profile-kpi"><span>${safe(label)}</span><strong>${safe(value)}</strong><small>${safe(sub)}</small></article>`;
+  }
+
+  function profileCard(title,body,sub="",wide=false){
+    return `<article class="profile-card ${wide?"wide":""}"><h3>${safe(title)}</h3>${sub?`<div class="profile-sub">${safe(sub)}</div>`:""}${body}</article>`;
+  }
+
+  function populationPyramid(people){
+    const male=Object.fromEntries(PROFILE_AGE_BANDS.map(x=>[x,0]));
+    const female=Object.fromEntries(PROFILE_AGE_BANDS.map(x=>[x,0]));
+    people.forEach(p=>{
+      const band=profileAgeBand(p.age);
+      if(!PROFILE_AGE_BANDS.includes(band))return;
+      if(/^male$/i.test(p.sex))male[band]++;
+      if(/^female$/i.test(p.sex))female[band]++;
+    });
+    const max=Math.max(1,...PROFILE_AGE_BANDS.flatMap(b=>[male[b],female[b]]));
+    const rows=[...PROFILE_AGE_BANDS].reverse().map(b=>{
+      const mw=Math.round(male[b]/max*100),fw=Math.round(female[b]/max*100);
+      return `<div class="pyramid-row">
+        <span class="pyramid-side male"><i style="width:${mw}%">${male[b]||""}</i></span>
+        <span class="age-band">${b}</span>
+        <span class="pyramid-side female"><i style="width:${fw}%">${female[b]||""}</i></span>
+      </div>`;
+    }).join("");
+    return `<div class="population-pyramid">
+      <div class="pyramid-header"><span>Male</span><span>Age</span><span>Female</span></div>
+      ${rows}
+      <div class="pyramid-footer"><span><b>${Object.values(male).reduce((a,b)=>a+b,0)}</b> male</span><span><b>${Object.values(female).reduce((a,b)=>a+b,0)}</b> female</span></div>
+    </div>`;
+  }
+
+  function simpleDistribution(values,limit=10){
+    const vals=values.filter(v=>!blank(v));
+    return renderBars(counts(vals),vals.length,limit);
+  }
+
+  function matrixChart(people,rowFn,colField,rowOrder=null,colLimit=7){
+    const rows=rowOrder||[...new Set(people.map(rowFn).filter(Boolean))];
+    const colCounts=counts(people.map(p=>p[colField]).filter(v=>!blank(v)));
+    const cols=colCounts.slice(0,colLimit).map(x=>x.label);
+    if(!rows.length||!cols.length)return '<div class="profile-empty">Not enough data for this matrix.</div>';
+    const table={};
+    let max=0;
+    rows.forEach(r=>{table[r]={};cols.forEach(c=>table[r][c]=0);});
+    people.forEach(p=>{
+      const r=rowFn(p),c=p[colField];
+      if(!table[r]||blank(c))return;
+      const col=cols.find(x=>x.toLowerCase()===normalize(c).toLowerCase());
+      if(!col)return;
+      table[r][col]++;
+      max=Math.max(max,table[r][col]);
+    });
+    const head=`<tr><th></th>${cols.map(c=>`<th>${safe(c)}</th>`).join("")}</tr>`;
+    const body=rows.map(r=>`<tr><th class="row-label">${safe(r)}</th>${cols.map(c=>{
+      const n=table[r][c]||0;
+      const heat=max?(.08+.72*n/max):.05;
+      return `<td class="${n?"":"zero"}" style="--heat:${heat.toFixed(2)}">${n||"—"}</td>`;
+    }).join("")}</tr>`).join("");
+    return `<div class="matrix-wrap"><table class="profile-matrix"><thead>${head}</thead><tbody>${body}</tbody></table></div>`;
+  }
+
+  function householdSizeDistribution(people){
+    const countsByRecord=new Map();
+    people.forEach(p=>countsByRecord.set(p.recordIndex,(countsByRecord.get(p.recordIndex)||0)+1));
+    const sizes=[...countsByRecord.values()];
+    if(!sizes.length)return '<div class="profile-empty">No household member profiles yet.</div>';
+    const categories=sizes.map(n=>n<=2?"1–2":n<=4?"3–4":n<=6?"5–6":"7+");
+    return simpleDistribution(categories);
+  }
+
+  function dependencyStats(people){
+    const known=people.filter(p=>p.age!==null);
+    const young=known.filter(p=>p.age<15).length;
+    const working=known.filter(p=>p.age>=15&&p.age<=64).length;
+    const older=known.filter(p=>p.age>=65).length;
+    const ratio=working?Math.round((young+older)/working*100):null;
+    return {young,working,older,ratio,known:known.length};
+  }
+
+  function repeaterValues(type,field){
+    return repeaterRows(type).map(r=>r[field]).filter(v=>!blank(v));
+  }
+
+  function yesNoMini(title,vals){
+    return profileCard(title,binaryChart(vals),`${answeredCount(vals)} answered`);
+  }
+
+  function vitalsProfileCards(){
+    const rows=repeaterRows("adult_vitals");
+    const specs=[
+      ["bp_systolic","Systolic BP"],["bp_diastolic","Diastolic BP"],
+      ["pulse_rate","Pulse rate"],["respiratory_rate","Respiratory rate"],
+      ["temperature_c","Temperature"],["spo2","SpO₂"]
+    ];
+    return specs.map(([field,label])=>profileCard(label,numericChart(rows.map(r=>r[field]).filter(v=>!blank(v))),`${rows.length} adult vital row(s)`)).join("");
+  }
+
+  function illnessByAge(){
+    const rows=repeaterRows("illnesses");
+    const bands=[];
+    rows.forEach(r=>{
+      const age=numericValue(r.age);
+      const illness=normalize(r.illness);
+      if(age===null||!illness)return;
+      bands.push(`${profileAgeBand(age)} · ${illness}`);
+    });
+    return simpleDistribution(bands,10);
+  }
+
+  function zoneComparison(){
+    const groups=new Map();
+    filteredRecords.forEach(r=>{
+      const zone=normalize(r.zone)||"Unspecified";
+      if(!groups.has(zone))groups.set(zone,[]);
+      groups.get(zone).push(r);
+    });
+    if(!groups.size)return '<div class="profile-empty">No zone data recorded.</div>';
+
+    const rate=(records,key,test=v=>/^yes$/i.test(normalize(v)))=>{
+      const vals=records.map(r=>r.response_json?.[key]).filter(v=>!blank(v));
+      return vals.length?pct(vals.filter(test).length,vals.length):0;
+    };
+    const treated=records=>{
+      const vals=records.map(r=>r.response_json?.water_treatment).filter(v=>!blank(v));
+      const n=vals.filter(v=>!/^(no treatment|none|no)$/i.test(normalize(v))).length;
+      return vals.length?pct(n,vals.length):0;
+    };
+
+    const header=`<div class="zone-row header"><span>Zone</span><span>n</span><span>Toilet</span><span>Treated water</span><span>Org involvement</span></div>`;
+    const rows=[...groups.entries()].sort((a,b)=>b[1].length-a[1].length).map(([zone,records])=>{
+      const toilet=rate(records,"with_toilet"),water=treated(records),org=rate(records,"community_org_involvement");
+      const metric=p=>`<span class="zone-metric"><span class="progress-track"><i style="width:${p}%"></i></span><small>${p}%</small></span>`;
+      return `<div class="zone-row"><span class="zone-name">${safe(zone)}</span><span class="zone-count">${records.length}</span>${metric(toilet)}${metric(water)}${metric(org)}</div>`;
+    }).join("");
+    return `<div class="zone-compare">${header}${rows}</div>`;
+  }
+
+  function topCommunityProblems(){
+    const vals=repeaterRows("problems").map(r=>r.problem).filter(v=>!blank(v));
+    return simpleDistribution(vals,10);
+  }
+
+  function overviewProfile(){
+    const people=getPopulationProfiles();
+    const dep=dependencyStats(people);
+    const pregnant=people.filter(p=>/^currently pregnant$/i.test(p.pregnancy_status)).length;
+    const under5=people.filter(p=>p.age!==null&&p.age<5).length;
+    const older=people.filter(p=>p.age!==null&&p.age>=60).length;
+    const hh=filteredRecords.length;
+    const avg=hh?people.length/hh:0;
+
+    const kpis=`<div class="profile-kpis">
+      ${profileKpi("Population",people.length,"profiled members")}
+      ${profileKpi("Avg. household size",fmt(avg,1),"profiled people / household")}
+      ${profileKpi("Under 5",under5,"profiled children")}
+      ${profileKpi("Age 60+",older,"profiled older adults")}
+      ${profileKpi("Pregnant",pregnant,"marked currently pregnant")}
+      ${profileKpi("Dependency ratio",dep.ratio===null?"—":`${dep.ratio}`,"dependents per 100 ages 15–64")}
+    </div>`;
+
+    const ageDist=people.map(p=>profileAgeBand(p.age)).filter(x=>x!=="Unknown");
+    const income=topValues("family_income_bracket");
+    const illness=repeaterRows("illnesses").map(r=>r.illness).filter(v=>!blank(v));
+
+    return `${kpis}<div class="profile-grid">
+      ${profileCard("Population Pyramid",populationPyramid(people),"Age × sex",true)}
+      ${profileCard("Age Structure",simpleDistribution(ageDist),"Profiled household members")}
+      ${profileCard("Household Size",householdSizeDistribution(people),"Based on listed household profiles")}
+      ${profileCard("Family Income",renderBars(counts(income),answeredCount(income),10),"Household distribution")}
+      ${profileCard("Top Reported Illnesses",simpleDistribution(illness,8),"From illness records")}
+    </div>
+    <div class="profile-note"><strong>Derived view:</strong> population totals depend on household head + family members entered in the survey. Missing member profiles are not imputed.</div>`;
+  }
+
+  function populationProfile(){
+    const people=getPopulationProfiles();
+    const sex=people.map(p=>p.sex).filter(v=>!blank(v));
+    const age=people.map(p=>profileAgeBand(p.age)).filter(x=>x!=="Unknown");
+    const civil=people.filter(p=>!blank(p.civil_status));
+    const edu=people.filter(p=>!blank(p.education));
+    const occupation=people.map(p=>p.occupation).filter(v=>!blank(v));
+    const dep=dependencyStats(people);
+
+    const kpis=`<div class="profile-kpis">
+      ${profileKpi("Known age",dep.known,`${people.length} profiles total`)}
+      ${profileKpi("Age <15",dep.young,"younger population")}
+      ${profileKpi("Age 15–64",dep.working,"working-age band")}
+      ${profileKpi("Age 65+",dep.older,"older dependents")}
+      ${profileKpi("Dependency ratio",dep.ratio===null?"—":dep.ratio,"per 100 ages 15–64")}
+      ${profileKpi("Sex recorded",sex.length,"member profiles")}
+    </div>`;
+
+    return `${kpis}<div class="profile-grid">
+      ${profileCard("Population Pyramid",populationPyramid(people),"Male and female age structure",true)}
+      ${profileCard("Age Group Distribution",simpleDistribution(age),"All profiled members")}
+      ${profileCard("Sex Distribution",simpleDistribution(sex),"All profiled members")}
+      ${profileCard("Civil Status × Age Group",matrixChart(civil,p=>profileAgeBand(p.age),"civil_status",PROFILE_AGE_BANDS),"Counts among members with both age and civil status",true)}
+      ${profileCard("Education × Age Group",matrixChart(edu,p=>profileAgeBand(p.age),"education",PROFILE_AGE_BANDS),"Top educational attainment categories",true)}
+      ${profileCard("Common Occupations",simpleDistribution(occupation,10),"Household head + member occupations")}
+    </div>`;
+  }
+
+  function healthProfile(){
+    const people=getPopulationProfiles();
+    const pregnant=people.filter(p=>/^currently pregnant$/i.test(p.pregnancy_status)).length;
+    const under5=people.filter(p=>p.age!==null&&p.age<5).length;
+    const under2=people.filter(p=>p.age!==null&&p.age<2).length;
+    const adults=people.filter(p=>p.age!==null&&p.age>=18).length;
+    const illnessRows=repeaterRows("illnesses");
+    const deathRows=repeaterRows("deaths");
+
+    const bf=repeaterValues("breastfeeding","exclusive_6mo");
+    const supp=repeaterValues("supplementary_feeding","supplementary_feeding");
+    const weightStatus=repeaterValues("nutrition_children","weight_status");
+    const heightStatus=repeaterValues("nutrition_children","height_status");
+    const immunStatus=repeaterValues("immunization_children","status");
+    const illnesses=illnessRows.map(r=>r.illness).filter(v=>!blank(v));
+    const illnessSex=illnessRows.map(r=>r.sex).filter(v=>!blank(v));
+    const causes=deathRows.map(r=>r.cause).filter(v=>!blank(v));
+    const phil=repeaterValues("philhealth_members","type");
+
+    const kpis=`<div class="profile-kpis">
+      ${profileKpi("Adults 18+",adults,"profiled members")}
+      ${profileKpi("Children <5",under5,"profiled members")}
+      ${profileKpi("Children <2",under2,"profiled members")}
+      ${profileKpi("Pregnant",pregnant,"marked currently pregnant")}
+      ${profileKpi("Illness records",illnessRows.length,"survey rows")}
+      ${profileKpi("Death records",deathRows.length,"survey rows")}
+    </div>`;
+
+    return `${kpis}<div class="profile-grid three">
+      ${yesNoMini("Exclusive Breastfeeding 6 Months",bf)}
+      ${yesNoMini("Supplementary Feeding",supp)}
+      ${profileCard("Child Weight Status",simpleDistribution(weightStatus),"Nutrition rows")}
+      ${profileCard("Child Height Status",simpleDistribution(heightStatus),"Nutrition rows")}
+      ${profileCard("Immunization Status",simpleDistribution(immunStatus),"Child immunization rows")}
+      ${profileCard("PhilHealth Member Types",simpleDistribution(phil),"Recorded member rows")}
+      ${profileCard("Top Reported Illnesses",simpleDistribution(illnesses,10),`${illnessRows.length} illness row(s)`)}
+      ${profileCard("Illness Records by Age × Illness",illnessByAge(),"Top combinations")}
+      ${profileCard("Illness Records by Sex",simpleDistribution(illnessSex),"Rows with sex recorded")}
+      ${profileCard("Reported Causes of Death",simpleDistribution(causes,8),`${deathRows.length} death row(s)`)}
+    </div>
+    <div class="profile-grid three" style="margin-top:7px">${vitalsProfileCards()}</div>
+    <div class="profile-note"><strong>Health graphs are descriptive.</strong> Vital-sign charts summarize recorded measurements and do not assign clinical diagnoses.</div>`;
+  }
+
+  function communityProfile(){
+    const income=topValues("family_income_bracket");
+    const livelihood=topValues("livelihood");
+    const education=getPopulationProfiles().map(p=>p.education).filter(v=>!blank(v));
+    const water=topValues("water_drinking");
+    const treatment=topValues("water_treatment");
+    const toilet=topValues("with_toilet");
+    const toiletType=topValues("toilet_type");
+    const garbage=topValues("garbage_disposal");
+    const animals=topValues("with_animals");
+    const org=topValues("community_org_involvement");
+    const projects=topValues("community_projects_participated");
+
+    return `<div class="profile-grid three">
+      ${profileCard("Family Income",renderBars(counts(income),answeredCount(income),10),"Household income bracket")}
+      ${profileCard("Livelihood",renderBars(counts(livelihood,{multi:true}),livelihood.filter(v=>Array.isArray(v)&&v.length).length,10),"Multiple responses allowed")}
+      ${profileCard("Educational Attainment",simpleDistribution(education,10),"Profiled members")}
+      ${profileCard("Drinking Water Source",renderBars(counts(water),answeredCount(water),10),"Households")}
+      ${profileCard("Water Treatment",renderBars(counts(treatment),answeredCount(treatment),10),"Households")}
+      ${yesNoMini("Households with Toilet",toilet)}
+      ${profileCard("Toilet Type",renderBars(counts(toiletType),answeredCount(toiletType),10),"Answered households")}
+      ${profileCard("Garbage Disposal",renderBars(counts(garbage,{multi:true}),garbage.filter(v=>Array.isArray(v)&&v.length).length,10),"Multiple responses allowed")}
+      ${yesNoMini("Animals in Household",animals)}
+      ${yesNoMini("Organization Involvement",org)}
+      ${profileCard("Community Projects Mentioned",simpleDistribution(projects,8),"Free-text responses")}
+      ${profileCard("Top Community Problems",topCommunityProblems(),"From Problems & Recommendations")}
+      ${profileCard("Zone Comparison",zoneComparison(),"Toilet, water treatment, and organization involvement",true)}
+    </div>
+    <div class="profile-note"><strong>Zone comparison:</strong> percentages use answered responses within each zone, so denominators may differ by indicator.</div>`;
+  }
+
+  function renderProfileDashboard(){
+    const note=document.getElementById("profile-sample-note");
+    if(note)note.textContent=`${filteredRecords.length} household${filteredRecords.length===1?"":"s"}`;
+    const target=document.getElementById("profile-dashboard");
+    if(!target)return;
+    if(!filteredRecords.length){
+      target.innerHTML='<div class="profile-empty">No completed surveys match the current filters.</div>';
+      return;
+    }
+    if(activeProfileTab==="population")target.innerHTML=populationProfile();
+    else if(activeProfileTab==="health")target.innerHTML=healthProfile();
+    else if(activeProfileTab==="community")target.innerHTML=communityProfile();
+    else target.innerHTML=overviewProfile();
+  }
+
   function renderOverview(){
     const gps=filteredRecords.filter(r=>r.latitude!=null&&r.longitude!=null).length;
     const barangays=new Set(filteredRecords.map(r=>normalize(r.barangay)).filter(Boolean)).size;
@@ -564,6 +917,7 @@ AAApp.context().then(async ctx=>{
 
   function renderAll(){
     renderOverview();
+    renderProfileDashboard();
     renderCompleteness();
     renderSections();
   }
@@ -673,6 +1027,14 @@ AAApp.context().then(async ctx=>{
       created_by:ctx.user.id,updated_by:ctx.user.id
     });
     if(error)alert(error.message);else priorities();
+  });
+
+  document.querySelectorAll("[data-profile-tab]").forEach(btn=>{
+    btn.addEventListener("click",()=>{
+      activeProfileTab=btn.dataset.profileTab||"overview";
+      document.querySelectorAll("[data-profile-tab]").forEach(x=>x.classList.toggle("active",x===btn));
+      renderProfileDashboard();
+    });
   });
 
   ["filter-barangay","filter-zone","filter-interviewer","filter-encoder","filter-from","filter-to"]

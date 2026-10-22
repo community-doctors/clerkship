@@ -9,7 +9,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="styles.css?v=3">
   <link rel="stylesheet" href="compact-ui.css?v=7">
-  <link rel="stylesheet" href="diagnosis-analytics.css?v=13">
+  <link rel="stylesheet" href="diagnosis-analytics.css?v=14">
   <style id="aa-hidden-safety">
     [hidden], .app-loading[hidden], #app-loading[hidden] {
       display:none!important;
@@ -73,6 +73,28 @@
 
       <section id="analytics-overview" class="analytics-overview"></section>
 
+      <section class="panel community-profile-panel">
+        <div class="panel-head community-profile-head">
+          <div>
+            <span class="eyebrow">Collated View</span>
+            <h2>Community Profile</h2>
+            <small>Population-based visuals derived from the household survey</small>
+          </div>
+          <span id="profile-sample-note" class="pill">—</span>
+        </div>
+
+        <div class="profile-tabs" role="tablist" aria-label="Community profile views">
+          <button type="button" class="active" data-profile-tab="overview">Overview</button>
+          <button type="button" data-profile-tab="population">Population</button>
+          <button type="button" data-profile-tab="health">Health</button>
+          <button type="button" data-profile-tab="community">Environment & Community</button>
+        </div>
+
+        <div id="profile-dashboard" class="profile-dashboard">
+          <div class="empty">Building community profile…</div>
+        </div>
+      </section>
+
       <section class="panel analytics-summary-panel">
         <div class="panel-head">
           <div><span class="eyebrow">Coverage</span><h2>Questionnaire Completion</h2></div>
@@ -124,6 +146,6 @@
   <script src="supabase-config.js"></script>
   <script src="offline-db.js?v=5"></script>
   <script src="app-common.js?v=10"></script>
-  <script src="diagnosis.js?v=13"></script>
+  <script src="diagnosis.js?v=14"></script>
 </body>
 </html>
