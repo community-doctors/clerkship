@@ -1,28 +1,43 @@
-# Alang-Alang 0–23 Months Population v20
+# Alang-Alang Source Trace v21
 
-Builds on v19 WARA Age Brackets.
+Builds on v20.
 
 ## Replace
-- diagnosis.html
-- diagnosis.js
-- diagnosis-analytics.css
+- `diagnosis.html`
+- `diagnosis.js`
+- `diagnosis-analytics.css`
 
 ## No SQL needed
 
-## Added
-The Health tab now automatically computes:
-- Total children 0–23 months
-- 0–11 months
-- 12–23 months
-- number derived from exact birthdate + interview date
-- number derived from recorded age fallback
+## New: click-through source tracing
+Click supported bars/values in Community Diagnosis to see exactly which source survey records produced the count.
 
-Birthdate is preferred. If birthdate is unavailable:
-- recorded age 0 years is classified as 0–11 months
-- recorded age 1 year is classified as 12–23 months
-- age 2 years and above is not included
+Supported examples include:
+- Sex Distribution, including `Unknown / not stated`
+- Population age groups and Population Pyramid bands
+- 0–23 months, 0–11 months, and 12–23 months
+- Reported illnesses and illness sex
+- Causes of death
+- family income, livelihood, water source/treatment, toilet type, garbage disposal
+- detailed categorical, binary, multi-select, text-frequency, and date questionnaire analytics
 
-The same canonical deduplicated population dataset used by the demographic dashboard is used here.
+## Source panel
+The drill-down lists:
+- household code
+- zone
+- interview date
+- interviewer
+- encoder
+- matching member or repeater-row detail when available
 
-The Data Audit tab also checks:
-0–23 months = 0–11 months + 12–23 months.
+`View survey` opens the entire individual survey in a read-only panel inside Diagnosis.
+
+If the signed-in user owns the survey (or is an admin), an `Edit survey` button is also shown. It safely materializes the synced record to the device before opening `household-survey.html`.
+
+## Privacy
+Direct identifiers are still excluded from aggregate graphs and exported images. They are only visible inside the authenticated source-survey drill-down for internal validation.
+
+## Offline behavior
+Read-only source tracing works from the cached analytics dataset. Editing a synced-only survey may require reconnecting first.
+
+Every detailed questionnaire analytics card also has a **Sources** button, including numeric fields that do not have clickable histogram bins.

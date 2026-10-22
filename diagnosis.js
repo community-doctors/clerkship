@@ -249,7 +249,7 @@ AAApp.context().then(async ctx=>{
     });
 
     // Hide UI-only elements from publication export.
-    root.querySelectorAll(".card-download-wrap,.graph-download-button,.profile-tabs,.analytics-actions,.analytics-nav").forEach(el=>el.remove());
+    root.querySelectorAll(".card-download-wrap,.graph-download-button,.source-inline-button,.profile-tabs,.analytics-actions,.analytics-nav").forEach(el=>el.remove());
 
     // Slightly larger paper-readable typography.
     root.querySelectorAll("h3").forEach(el=>el.style.fontSize="13px");
@@ -371,7 +371,7 @@ AAApp.context().then(async ctx=>{
   async function loadRecords(){
     if(ctx.online()&&ctx.client){
       const {data,error}=await ctx.client.from("aa_household_submissions")
-        .select("id,submitted_by,status,household_code,interview_date,barangay,zone,interviewer,response_json,latitude,longitude,created_at,updated_at")
+        .select("id,local_uuid,submitted_by,status,household_code,interview_date,barangay,zone,interviewer,response_json,latitude,longitude,gps_accuracy_m,location_captured_at,photo_path,created_at,updated_at")
         .eq("status","completed")
         .order("updated_at",{ascending:false});
       if(error)throw error;
@@ -573,6 +573,17 @@ AAApp.context().then(async ctx=>{
     return {key:alias?basicCategoryKey(alias):singularLike(key),label:alias||prettyCategory(raw)};
   }
 
+
+  function traceData(spec){
+    if(!spec)return "";
+    return ` data-trace="${safe(encodeURIComponent(JSON.stringify(spec)))}" tabindex="0" role="button" title="View source survey(s)"`;
+  }
+
+  function makeTraceSpec(base,value,extra={}){
+    if(!base)return null;
+    return {...base,value,...extra};
+  }
+
   function counts(vals,{multi=false}={}){
     const groups=[];
     vals.forEach(raw=>{
@@ -598,7 +609,7 @@ AAApp.context().then(async ctx=>{
 
   function answeredCount(vals){return vals.filter(v=>!blank(v)).length}
 
-  function renderBars(items,denom,limit=Infinity){
+  function renderBars(items,denom,limit=Infinity,traceBase=null){
     if(!items.length)return '<div class="no-data-box">No answered data.</div>';
     const shown=Number.isFinite(limit)?items.slice(0,limit):items;
     const max=Math.max(...shown.map(x=>x.count),1);
@@ -606,11 +617,12 @@ AAApp.context().then(async ctx=>{
       const percent=denom?pct(x.count,denom):0;
       const width=Math.max(3,Math.round(x.count/max*100));
       const variantNote=x.variants&&x.variants.length>1?` title="Combined variants: ${safe(x.variants.join(" | "))}"`:"";
-      return `<div class="bar-row"${variantNote}><span class="bar-label">${safe(x.label)}</span><span class="bar-track"><i style="width:${width}%"></i></span><span class="bar-value">${x.count}${denom?` · ${percent}%`:""}</span></div>`;
+      const trace=makeTraceSpec(traceBase,x.label,{variants:x.variants||[]});
+      return `<div class="bar-row${trace?" traceable-data":""}"${variantNote}${traceData(trace)}><span class="bar-label">${safe(x.label)}</span><span class="bar-track"><i style="width:${width}%"></i></span><span class="bar-value">${x.count}${denom?` · ${percent}%`:""}</span></div>`;
     }).join("")}</div>`;
   }
 
-  function binaryChart(vals){
+  function binaryChart(vals,traceBase=null){
     const answered=vals.filter(v=>!blank(v));
     const yes=answered.filter(v=>/^(yes|true)$/i.test(normalize(v))).length;
     const no=answered.filter(v=>/^(no|false)$/i.test(normalize(v))).length;
@@ -619,8 +631,8 @@ AAApp.context().then(async ctx=>{
     return `<div class="binary-chart">
       <div class="donut" style="--donut-angle:${Math.round(p*3.6)}deg"><strong>${p}%</strong></div>
       <div class="donut-legend">
-        <div><span>Yes</span><b>${yes}</b></div>
-        <div><span>No</span><b>${no}</b></div>
+        <div class="${traceBase?"traceable-data":""}"${traceData(makeTraceSpec(traceBase,"Yes"))}><span>Yes</span><b>${yes}</b></div>
+        <div class="${traceBase?"traceable-data":""}"${traceData(makeTraceSpec(traceBase,"No"))}><span>No</span><b>${no}</b></div>
         <div><span>Answered</span><b>${denom}</b></div>
       </div>
     </div>`;
@@ -649,7 +661,7 @@ AAApp.context().then(async ctx=>{
       </div>`;
   }
 
-  function dateChart(vals){
+  function dateChart(vals,traceBase=null){
     const ds=vals.map(dateValue).filter(Boolean);
     const m=new Map();
     ds.forEach(d=>{
@@ -657,36 +669,37 @@ AAApp.context().then(async ctx=>{
       m.set(key,(m.get(key)||0)+1);
     });
     const items=[...m].sort((a,b)=>a[0].localeCompare(b[0])).map(([label,count])=>({label,count}));
-    return renderBars(items,ds.length,12);
+    return renderBars(items,ds.length,Infinity,traceBase?{...traceBase,mode:"date-month"}:null);
   }
 
-  function identifierChart(vals){
+  function identifierChart(vals,traceBase=null){
     const n=answeredCount(vals);
-    return `<div class="identifier-box"><strong>Identifier hidden</strong>${n} of ${filteredRecords.length} records contain this field. Values are not displayed in aggregate analytics.</div>`;
+    return `<div class="identifier-box"><strong>Identifier hidden</strong>${n} of ${filteredRecords.length} records contain this field. Values are not displayed in aggregate analytics.${traceBase?` <button type="button" class="source-inline-button traceable-data"${traceData({...traceBase,mode:"answered"})}>View source surveys</button>`:""}</div>`;
   }
 
-  function textChart(vals){
+  function textChart(vals,traceBase=null){
     const answered=vals.filter(v=>!blank(v));
     const itemCounts=counts(answered);
     const unique=itemCounts.length;
-    const chart=renderBars(itemCounts,answered.length);
+    const chart=renderBars(itemCounts,answered.length,Infinity,traceBase);
     return `${chart}<div class="text-note">${unique} unique response${unique===1?"":"s"} among ${answered.length} answered.</div>`;
   }
 
-  function multiChart(vals){
+  function multiChart(vals,traceBase=null){
     const answered=vals.filter(v=>Array.isArray(v)&&v.length);
     const items=counts(answered,{multi:true});
-    return renderBars(items,answered.length);
+    return renderBars(items,answered.length,Infinity,traceBase);
   }
 
-  function chartFor(vals,key,type){
-    if(type==="identifier")return identifierChart(vals);
-    if(type==="binary")return binaryChart(vals);
+  function chartFor(vals,key,type,path){
+    const traceBase={kind:path.includes(".")?"repeater-field":"field",path,type};
+    if(type==="identifier")return identifierChart(vals,traceBase);
+    if(type==="binary")return binaryChart(vals,traceBase);
     if(type==="numeric")return numericChart(vals);
-    if(type==="date")return dateChart(vals);
-    if(type==="multi")return multiChart(vals);
-    if(type==="text")return textChart(vals);
-    if(type==="categorical")return renderBars(counts(vals),answeredCount(vals));
+    if(type==="date")return dateChart(vals,traceBase);
+    if(type==="multi")return multiChart(vals,traceBase);
+    if(type==="text")return textChart(vals,traceBase);
+    if(type==="categorical")return renderBars(counts(vals),answeredCount(vals),Infinity,traceBase);
     if(type==="empty")return '<div class="no-data-box">No answered data.</div>';
     return '<div class="no-data-box">Nested data summarized below.</div>';
   }
@@ -719,13 +732,13 @@ AAApp.context().then(async ctx=>{
     addCsv(path,label,type,vals,scope,type==="multi"?vals.filter(v=>Array.isArray(v)&&v.length).length:(scope==="household"?filteredRecords.length:vals.length));
     renderedQuestions++;
     return `<article class="question-card" data-question="${safe((label+" "+path).toLowerCase())}">
-      <div class="question-card-head"><h3>${safe(label)}</h3><span class="field-code">${safe(path)}</span></div>
+      <div class="question-card-head"><h3>${safe(label)}</h3><div class="question-card-tools"><span class="field-code">${safe(path)}</span><button type="button" class="source-inline-button traceable-data"${traceData({kind:path.includes(".")?"repeater-field":"field",path,type,mode:"answered"})}>Sources</button></div></div>
       <div class="question-sub">
         <span>${safe(type)}</span>
         <span>${answered} answered</span>
         ${scope!=="household"?`<span>${safe(scope)}</span>`:""}
       </div>
-      ${chartFor(vals,key,type)}
+      ${chartFor(vals,key,type,path)}
     </article>`;
   }
 
@@ -1017,9 +1030,9 @@ AAApp.context().then(async ctx=>{
       const mw=Math.round(male[b]/max*100),fw=Math.round(female[b]/max*100);
       const total=male[b]+female[b]+other[b];
       return `<div class="pyramid-row">
-        <span class="pyramid-side male"><i style="width:${mw}%">${male[b]||""}</i></span>
-        <span class="age-band"><b>${total}</b><em>${b}</em>${other[b]?`<small>+${other[b]} sex not stated/other</small>`:""}</span>
-        <span class="pyramid-side female"><i style="width:${fw}%">${female[b]||""}</i></span>
+        <span class="pyramid-side male traceable-data"${traceData({kind:"population-age-sex",value:b,sex:"Male"})}><i style="width:${mw}%">${male[b]||""}</i></span>
+        <span class="age-band traceable-data"${traceData({kind:"population-age",value:b})}><b>${total}</b><em>${b}</em>${other[b]?`<small>+${other[b]} sex not stated/other</small>`:""}</span>
+        <span class="pyramid-side female traceable-data"${traceData({kind:"population-age-sex",value:b,sex:"Female"})}><i style="width:${fw}%">${female[b]||""}</i></span>
       </div>`;
     }).join("");
 
@@ -1040,9 +1053,9 @@ AAApp.context().then(async ctx=>{
     </div>`;
   }
 
-  function simpleDistribution(values,limit=Infinity){
+  function simpleDistribution(values,limit=Infinity,traceBase=null){
     const vals=values.filter(v=>!blank(v));
-    return renderBars(counts(vals),vals.length);
+    return renderBars(counts(vals),vals.length,Infinity,traceBase);
   }
 
   function matrixChart(people,rowFn,colField,rowOrder=null,colLimit=7){
@@ -1092,8 +1105,8 @@ AAApp.context().then(async ctx=>{
     return repeaterRows(type).map(r=>r[field]).filter(v=>!blank(v));
   }
 
-  function yesNoMini(title,vals){
-    return profileCard(title,binaryChart(vals),`${answeredCount(vals)} answered`);
+  function yesNoMini(title,vals,traceBase=null){
+    return profileCard(title,binaryChart(vals,traceBase),`${answeredCount(vals)} answered`);
   }
 
   function vitalsProfileCards(){
@@ -1294,10 +1307,10 @@ AAApp.context().then(async ctx=>{
 
     return `${kpis}<div class="profile-grid">
       ${profileCard("Population Pyramid",populationPyramid(people),"Age × sex",true)}
-      ${profileCard("Age Structure",simpleDistribution(ageDist),"Profiled household members")}
+      ${profileCard("Age Structure",simpleDistribution(ageDist,Infinity,{kind:"population-age"}),"Profiled household members")}
       ${profileCard("Household Size",householdSizeDistribution(people),"Based on listed household profiles")}
-      ${profileCard("Family Income",renderBars(counts(income),answeredCount(income)),"Household distribution")}
-      ${profileCard("Reported Illnesses",simpleDistribution(illness),"From illness records")}
+      ${profileCard("Family Income",renderBars(counts(income),answeredCount(income),Infinity,{kind:"field",path:"family_income_bracket",type:"categorical"}),"Household distribution")}
+      ${profileCard("Reported Illnesses",simpleDistribution(illness,Infinity,{kind:"repeater-field",path:"illnesses.illness",type:"categorical"}),"From illness records")}
     </div>
     <div class="profile-note"><strong>Derived view:</strong> population totals depend on household head + family members entered in the survey. Missing member profiles are not imputed.</div>`;
   }
@@ -1322,11 +1335,11 @@ AAApp.context().then(async ctx=>{
 
     return `${kpis}<div class="profile-grid">
       ${profileCard("Population Pyramid",populationPyramid(people),"Male and female age structure",true)}
-      ${profileCard("Age Group Distribution",simpleDistribution(age),"All profiled members")}
-      ${profileCard("Sex Distribution",simpleDistribution(sex),"All profiled members")}
+      ${profileCard("Age Group Distribution",simpleDistribution(age,Infinity,{kind:"population-age"}),"All profiled members")}
+      ${profileCard("Sex Distribution",simpleDistribution(sex,Infinity,{kind:"population-field",field:"sex_group"}),"All profiled members")}
       ${profileCard("Civil Status × Age Group",matrixChart(civil,p=>profileAgeBand(p.age),"civil_status",PROFILE_AGE_BANDS),"Counts among members with both age and civil status",true)}
       ${profileCard("Education × Age Group",matrixChart(edu,p=>profileAgeBand(p.age),"education",PROFILE_AGE_BANDS),"Top educational attainment categories",true)}
-      ${profileCard("Common Occupations",simpleDistribution(occupation),"Household head + member occupations")}
+      ${profileCard("Common Occupations",simpleDistribution(occupation,Infinity,{kind:"population-field",field:"occupation"}),"Household head + member occupations")}
     </div>`;
   }
 
@@ -1346,9 +1359,9 @@ AAApp.context().then(async ctx=>{
     return profileCard(
       "Children 0–23 Months",
       `<div class="infant-age-breakdown">
-        <div class="infant-age-stat"><span>Total 0–23 months</span><strong>${s.total}</strong><small>Eligible population</small></div>
-        <div class="infant-age-stat"><span>0–11 months</span><strong>${s.infant011}</strong><small>Infants</small></div>
-        <div class="infant-age-stat"><span>12–23 months</span><strong>${s.child1223}</strong><small>Young children</small></div>
+        <div class="infant-age-stat traceable-data"${traceData({kind:"population-month-range",label:"Children 0–23 months",min:0,max:23})}><span>Total 0–23 months</span><strong>${s.total}</strong><small>Eligible population</small></div>
+        <div class="infant-age-stat traceable-data"${traceData({kind:"population-month-range",label:"Children 0–11 months",min:0,max:11})}><span>0–11 months</span><strong>${s.infant011}</strong><small>Infants</small></div>
+        <div class="infant-age-stat traceable-data"${traceData({kind:"population-month-range",label:"Children 12–23 months",min:12,max:23})}><span>12–23 months</span><strong>${s.child1223}</strong><small>Young children</small></div>
       </div>
       <div class="infant-method-note"><strong>Age source:</strong> ${s.exact} exact from birthdate + interview date; ${s.fallback} from recorded age fallback.</div>`,
       "Use this denominator for indicators requiring the 0–23-month population",
@@ -1386,16 +1399,16 @@ AAApp.context().then(async ctx=>{
 
     return `${kpis}<div class="profile-grid three">
       ${infant023Card()}
-      ${yesNoMini("Exclusive Breastfeeding 6 Months",bf)}
-      ${yesNoMini("Supplementary Feeding",supp)}
-      ${profileCard("Child Weight Status",simpleDistribution(weightStatus),"Nutrition rows")}
-      ${profileCard("Child Height Status",simpleDistribution(heightStatus),"Nutrition rows")}
-      ${profileCard("Immunization Status",simpleDistribution(immunStatus),"Child immunization rows")}
-      ${profileCard("PhilHealth Member Types",simpleDistribution(phil),"Recorded member rows")}
-      ${profileCard("Reported Illnesses",simpleDistribution(illnesses),`${illnessRows.length} illness row(s)`)}
+      ${yesNoMini("Exclusive Breastfeeding 6 Months",bf,{kind:"repeater-field",path:"breastfeeding.exclusive_6mo",type:"binary"})}
+      ${yesNoMini("Supplementary Feeding",supp,{kind:"repeater-field",path:"supplementary_feeding.supplementary_feeding",type:"binary"})}
+      ${profileCard("Child Weight Status",simpleDistribution(weightStatus,Infinity,{kind:"repeater-field",path:"nutrition_children.weight_status",type:"categorical"}),"Nutrition rows")}
+      ${profileCard("Child Height Status",simpleDistribution(heightStatus,Infinity,{kind:"repeater-field",path:"nutrition_children.height_status",type:"categorical"}),"Nutrition rows")}
+      ${profileCard("Immunization Status",simpleDistribution(immunStatus,Infinity,{kind:"repeater-field",path:"immunization_children.status",type:"categorical"}),"Child immunization rows")}
+      ${profileCard("PhilHealth Member Types",simpleDistribution(phil,Infinity,{kind:"repeater-field",path:"philhealth_members.type",type:"categorical"}),"Recorded member rows")}
+      ${profileCard("Reported Illnesses",simpleDistribution(illnesses,Infinity,{kind:"repeater-field",path:"illnesses.illness",type:"categorical"}),`${illnessRows.length} illness row(s)`)}
       ${profileCard("Illness Records by Age × Illness",illnessByAge(),"All recorded age–illness combinations")}
-      ${profileCard("Illness Records by Sex",simpleDistribution(illnessSex),"Rows with sex recorded")}
-      ${profileCard("Reported Causes of Death",simpleDistribution(causes),`${deathRows.length} death row(s)`)}
+      ${profileCard("Illness Records by Sex",simpleDistribution(illnessSex,Infinity,{kind:"repeater-field",path:"illnesses.sex",type:"categorical"}),"Rows with sex recorded")}
+      ${profileCard("Reported Causes of Death",simpleDistribution(causes,Infinity,{kind:"repeater-field",path:"deaths.cause",type:"categorical"}),`${deathRows.length} death row(s)`)}
     </div>
     <div class="profile-grid three" style="margin-top:7px">${vitalsProfileCards()}</div>
     <div class="profile-note"><strong>Health graphs are descriptive.</strong> Vital-sign charts summarize recorded measurements and do not assign clinical diagnoses.</div>`;
@@ -1415,16 +1428,16 @@ AAApp.context().then(async ctx=>{
     const projects=topValues("community_projects_participated");
 
     return `<div class="profile-grid three">
-      ${profileCard("Family Income",renderBars(counts(income),answeredCount(income)),"Household income bracket")}
-      ${profileCard("Livelihood",renderBars(counts(livelihood,{multi:true}),livelihood.filter(v=>Array.isArray(v)&&v.length).length),"Multiple responses allowed")}
-      ${profileCard("Educational Attainment",simpleDistribution(education),"Profiled members")}
-      ${profileCard("Drinking Water Source",renderBars(counts(water),answeredCount(water)),"Households")}
-      ${profileCard("Water Treatment",renderBars(counts(treatment),answeredCount(treatment)),"Households")}
-      ${yesNoMini("Households with Toilet",toilet)}
-      ${profileCard("Toilet Type",renderBars(counts(toiletType),answeredCount(toiletType)),"Answered households")}
-      ${profileCard("Garbage Disposal",renderBars(counts(garbage,{multi:true}),garbage.filter(v=>Array.isArray(v)&&v.length).length),"Multiple responses allowed")}
-      ${yesNoMini("Animals in Household",animals)}
-      ${yesNoMini("Organization Involvement",org)}
+      ${profileCard("Family Income",renderBars(counts(income),answeredCount(income),Infinity,{kind:"field",path:"family_income_bracket",type:"categorical"}),"Household income bracket")}
+      ${profileCard("Livelihood",renderBars(counts(livelihood,{multi:true}),livelihood.filter(v=>Array.isArray(v)&&v.length).length,Infinity,{kind:"field",path:"livelihood",type:"multi"}),"Multiple responses allowed")}
+      ${profileCard("Educational Attainment",simpleDistribution(education,Infinity,{kind:"population-field",field:"education"}),"Profiled members")}
+      ${profileCard("Drinking Water Source",renderBars(counts(water),answeredCount(water),Infinity,{kind:"field",path:"water_drinking",type:"categorical"}),"Households")}
+      ${profileCard("Water Treatment",renderBars(counts(treatment),answeredCount(treatment),Infinity,{kind:"field",path:"water_treatment",type:"categorical"}),"Households")}
+      ${yesNoMini("Households with Toilet",toilet,{kind:"field",path:"with_toilet",type:"binary"})}
+      ${profileCard("Toilet Type",renderBars(counts(toiletType),answeredCount(toiletType),Infinity,{kind:"field",path:"toilet_type",type:"categorical"}),"Answered households")}
+      ${profileCard("Garbage Disposal",renderBars(counts(garbage,{multi:true}),garbage.filter(v=>Array.isArray(v)&&v.length).length,Infinity,{kind:"field",path:"garbage_disposal",type:"multi"}),"Multiple responses allowed")}
+      ${yesNoMini("Animals in Household",animals,{kind:"field",path:"with_animals",type:"binary"})}
+      ${yesNoMini("Organization Involvement",org,{kind:"field",path:"community_org_involvement",type:"binary"})}
       ${profileCard("Community Projects Mentioned",simpleDistribution(projects),"Free-text responses")}
       ${profileCard("Top Community Problems",topCommunityProblems(),"From Problems & Recommendations")}
       ${profileCard("Zone Comparison",zoneComparison(),"Toilet, water treatment, and organization involvement",true)}
@@ -1479,6 +1492,210 @@ AAApp.context().then(async ctx=>{
     ];
     document.getElementById("analytics-overview").innerHTML=cards.map(([a,b,c])=>`<article class="kpi-card"><span>${safe(a)}</span><strong>${safe(b)}</strong><small>${safe(c)}</small></article>`).join("");
   }
+
+
+  function sameCanonical(a,b){
+    if(blank(a)||blank(b))return false;
+    return canonicalCategory(a).key===canonicalCategory(b).key;
+  }
+
+  function valueMatchesTrace(raw,spec){
+    if(spec.mode==="answered")return !blank(raw);
+    if(spec.mode==="date-month"){
+      const d=dateValue(raw);
+      if(!d)return false;
+      const key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+      return key===spec.value;
+    }
+    if(spec.type==="binary"){
+      const n=normalize(raw).toLowerCase();
+      const wanted=normalize(spec.value).toLowerCase();
+      if(wanted==="yes")return n==="yes"||n==="true";
+      if(wanted==="no")return n==="no"||n==="false";
+    }
+    if(Array.isArray(raw))return raw.some(v=>sameCanonical(v,spec.value));
+    return sameCanonical(raw,spec.value);
+  }
+
+  function traceMatches(spec){
+    const matches=[];
+    if(!spec)return matches;
+
+    if(spec.kind==="field"){
+      filteredRecords.forEach((record,recordIndex)=>{
+        const raw=record.response_json?.[spec.path];
+        if(valueMatchesTrace(raw,spec))matches.push({record,recordIndex,detail:{field:spec.path,value:raw}});
+      });
+      return matches;
+    }
+
+    if(spec.kind==="repeater-field"){
+      const [rep,field]=spec.path.split(".");
+      filteredRecords.forEach((record,recordIndex)=>{
+        const rows=record.response_json?.[rep];
+        if(!Array.isArray(rows))return;
+        rows.forEach((row,rowIndex)=>{
+          if(row&&typeof row==="object"&&valueMatchesTrace(row[field],spec)){
+            matches.push({record,recordIndex,detail:{repeater:rep,field,rowIndex,row,value:row[field]}});
+          }
+        });
+      });
+      return matches;
+    }
+
+    if(spec.kind==="population-age"||spec.kind==="population-age-sex"||spec.kind==="population-field"||spec.kind==="population-month-range"){
+      getPopulationProfiles().forEach(person=>{
+        let ok=false;
+        if(spec.kind==="population-age")ok=person.age_band===spec.value;
+        else if(spec.kind==="population-age-sex")ok=person.age_band===spec.value&&person.sex_group===spec.sex;
+        else if(spec.kind==="population-field")ok=sameCanonical(person[spec.field],spec.value);
+        else ok=person.age_months!==null&&person.age_months>=spec.min&&person.age_months<=spec.max;
+        if(ok){
+          const record=filteredRecords[person.recordIndex];
+          if(record)matches.push({record,recordIndex:person.recordIndex,detail:{person}});
+        }
+      });
+      return matches;
+    }
+    return matches;
+  }
+
+  function ensureSourceTraceModal(){
+    let modal=document.getElementById("source-trace-modal");
+    if(modal)return modal;
+    modal=document.createElement("div");
+    modal.id="source-trace-modal";
+    modal.className="source-trace-modal";
+    modal.hidden=true;
+    modal.innerHTML=`<section class="source-trace-dialog" role="dialog" aria-modal="true" aria-labelledby="source-trace-title">
+      <header class="source-trace-head"><div><h2 id="source-trace-title">Source surveys</h2><p id="source-trace-subtitle"></p></div><button type="button" class="source-trace-close" aria-label="Close">×</button></header>
+      <div class="source-trace-body" id="source-trace-body"></div>
+    </section>`;
+    document.body.appendChild(modal);
+    modal.querySelector(".source-trace-close").addEventListener("click",()=>{modal.hidden=true;document.body.style.overflow="";});
+    modal.addEventListener("click",e=>{if(e.target===modal){modal.hidden=true;document.body.style.overflow="";}});
+    return modal;
+  }
+
+  function matchDetailText(match){
+    const d=match.detail||{};
+    if(d.person){
+      const p=d.person;
+      const bits=[p.name&&`Member: ${p.name}`,p.role&&`Role: ${p.role}`,p.age!==null&&`Age: ${p.age}`,p.sex_group&&`Sex: ${p.sex_group}`].filter(Boolean);
+      return bits.join(" · ");
+    }
+    if(d.row){
+      const preferred=["name","member_name","person_name","illness","cause","age","sex","status","type"];
+      const bits=[];
+      preferred.forEach(k=>{if(!blank(d.row[k]))bits.push(`${humanize(k)}: ${normalize(d.row[k])}`);});
+      if(!bits.length)bits.push(`${humanize(d.field||"Match")}: ${normalize(d.value)}`);
+      return bits.join(" · ");
+    }
+    return d.field?`${fieldLabel(d.field)}: ${Array.isArray(d.value)?d.value.join(" | "):normalize(d.value)}`:"";
+  }
+
+  function canEditRecord(record){
+    return ctx.member?.role==="admin" || (!!record.submitted_by&&record.submitted_by===ctx.user?.id);
+  }
+
+  function sourceLabel(spec){
+    if(spec.label)return spec.label;
+    if(spec.kind==="population-age")return `Age group: ${spec.value}`;
+    if(spec.kind==="population-age-sex")return `${spec.sex}, age ${spec.value}`;
+    if(spec.kind==="population-field")return `${humanize(spec.field)}: ${spec.value}`;
+    if(spec.path)return `${fieldLabel(spec.path)}${spec.value!==undefined?`: ${spec.value}`:""}`;
+    return spec.value||"Selected data";
+  }
+
+  function showTraceSources(spec){
+    const modal=ensureSourceTraceModal();
+    const body=modal.querySelector("#source-trace-body");
+    const title=modal.querySelector("#source-trace-title");
+    const subtitle=modal.querySelector("#source-trace-subtitle");
+    const matches=traceMatches(spec);
+    title.textContent="Source surveys";
+    subtitle.textContent=`${sourceLabel(spec)} · ${matches.length} matching record${matches.length===1?"":"s"}`;
+    if(!matches.length){body.innerHTML='<div class="source-trace-empty">No matching source record was found under the current filters.</div>';}
+    else{
+      body.innerHTML=`<div class="source-match-list">${matches.map((m,i)=>{
+        const r=m.record;
+        const hh=r.household_code||r.response_json?.household_number||`Household ${m.recordIndex+1}`;
+        const detail=matchDetailText(m);
+        return `<article class="source-match">
+          <div><h3>${safe(hh)}</h3><div class="source-match-meta"><span>${safe(r.zone||"Zone not stated")}</span><span>${safe(r.interview_date||"No interview date")}</span><span>Interviewer: ${safe(r.interviewer||"Not stated")}</span><span>Encoder: ${safe(encoderName(r.submitted_by))}</span></div>${detail?`<div class="source-match-detail">${safe(detail)}</div>`:""}</div>
+          <div class="source-match-actions"><button type="button" class="primary" data-view-source-record="${m.recordIndex}">View survey</button>${canEditRecord(r)?`<button type="button" data-edit-source-record="${m.recordIndex}">Edit survey</button>`:""}</div>
+        </article>`;
+      }).join("")}</div><div class="source-privacy-note">Source tracing is for internal data validation. Direct identifiers remain excluded from exported aggregate graphs.</div>`;
+    }
+    modal.hidden=false;
+    document.body.style.overflow="hidden";
+  }
+
+  function readableValue(value){
+    if(blank(value))return "—";
+    if(Array.isArray(value)){
+      if(value.every(v=>v===null||["string","number","boolean"].includes(typeof v)))return value.filter(v=>v!==null).join(" | ")||"—";
+      return `${value.length} row${value.length===1?"":"s"}`;
+    }
+    if(typeof value==="object")return JSON.stringify(value);
+    return String(value);
+  }
+
+  function renderReadOnlySurvey(record,recordIndex){
+    const modal=ensureSourceTraceModal();
+    const body=modal.querySelector("#source-trace-body");
+    const title=modal.querySelector("#source-trace-title");
+    const subtitle=modal.querySelector("#source-trace-subtitle");
+    const j=record.response_json||{};
+    const hh=record.household_code||j.household_number||`Household ${recordIndex+1}`;
+    title.textContent=hh;
+    subtitle.textContent="Read-only source survey";
+
+    const topFields=[];
+    const repeaters=[];
+    Object.entries(j).forEach(([key,value])=>{
+      if(Array.isArray(value)&&value.some(v=>v&&typeof v==="object"&&!Array.isArray(v)))repeaters.push([key,value]);
+      else topFields.push([key,value]);
+    });
+
+    const topHtml=`<section class="readonly-survey-section"><h3>Household survey responses</h3><div class="readonly-field-grid">${topFields.sort((a,b)=>a[0].localeCompare(b[0])).map(([k,v])=>`<div class="readonly-field"><span>${safe(fieldLabel(k))}</span><strong>${safe(readableValue(v))}</strong></div>`).join("")}</div></section>`;
+    const repHtml=repeaters.sort((a,b)=>a[0].localeCompare(b[0])).map(([key,rows])=>`<section class="readonly-survey-section"><h3>${safe(humanize(key))}</h3><div class="readonly-repeater">${rows.map((row,i)=>`<div class="readonly-repeater-row"><strong>Row ${i+1}</strong><div class="readonly-field-grid">${Object.entries(row||{}).map(([k,v])=>`<div class="readonly-field"><span>${safe(fieldLabel(`${key}.${k}`))}</span><strong>${safe(readableValue(v))}</strong></div>`).join("")}</div></div>`).join("")}</div></section>`).join("");
+
+    body.innerHTML=`<div class="source-survey-toolbar"><button type="button" data-back-to-trace>← Back to source list</button>${canEditRecord(record)?`<button type="button" data-edit-source-record="${recordIndex}">Edit this survey</button>`:""}</div>
+      <div class="source-survey-meta"><div><span>Household</span><strong>${safe(hh)}</strong></div><div><span>Interview date</span><strong>${safe(record.interview_date||"—")}</strong></div><div><span>Zone</span><strong>${safe(record.zone||"—")}</strong></div><div><span>Interviewer</span><strong>${safe(record.interviewer||"—")}</strong></div><div><span>Encoder</span><strong>${safe(encoderName(record.submitted_by))}</strong></div><div><span>Record ID</span><strong>${safe((record.local_uuid||record.id||"—").slice(0,12))}</strong></div></div>${topHtml}${repHtml}`;
+  }
+
+  async function editSourceRecord(recordIndex){
+    const record=filteredRecords[Number(recordIndex)];
+    if(!record||!canEditRecord(record)){alert("You can only edit your own surveys unless you are an admin.");return;}
+    if(!record.local_uuid){alert("This cached record does not include a local survey ID. Reconnect and refresh the Diagnosis page first.");return;}
+    let local=await ctx.db.getSubmission(record.local_uuid);
+    if(!local){
+      if(!ctx.online()){alert("Reconnect first so this synced survey can be opened safely for editing.");return;}
+      const gps=(record.latitude!==null&&record.latitude!==undefined&&record.longitude!==null&&record.longitude!==undefined)?{latitude:record.latitude,longitude:record.longitude,accuracy:record.gps_accuracy_m??null,altitude:null,captured_at:record.location_captured_at||null,source:"server"}:null;
+      local={local_uuid:record.local_uuid,form_code:"SHS-HH-2023",form_version:"2023.1",form_status:record.status||"completed",sync_status:"synced",server_id:record.id,submitted_by:record.submitted_by,user_id:record.submitted_by,community_id:null,community_name:"Alang-Alang",household_number:record.household_code||"",interview_date:record.interview_date||"",barangay:record.barangay||"",zone:record.zone||"",interviewer:record.interviewer||"",responses:record.response_json||{},gps,has_location:!!gps,has_photo:!!record.photo_path,photo_path:record.photo_path||null,created_at:record.created_at||new Date().toISOString(),updated_at:record.updated_at||new Date().toISOString(),synced_at:record.updated_at||new Date().toISOString(),last_error:null};
+      await ctx.db.putSubmission(local);
+    }
+    location.href=`household-survey.html?local_id=${encodeURIComponent(record.local_uuid)}`;
+  }
+
+  let lastTraceSpec=null;
+  document.addEventListener("click",e=>{
+    const trace=e.target.closest("[data-trace]");
+    if(trace&&!trace.closest("#source-trace-modal")){
+      try{lastTraceSpec=JSON.parse(decodeURIComponent(trace.dataset.trace));showTraceSources(lastTraceSpec);}catch(err){console.error(err);}
+      return;
+    }
+    const view=e.target.closest("[data-view-source-record]");
+    if(view){const idx=Number(view.dataset.viewSourceRecord);const record=filteredRecords[idx];if(record)renderReadOnlySurvey(record,idx);return;}
+    const edit=e.target.closest("[data-edit-source-record]");
+    if(edit){editSourceRecord(edit.dataset.editSourceRecord);return;}
+    if(e.target.closest("[data-back-to-trace]")&&lastTraceSpec){showTraceSources(lastTraceSpec);}
+  });
+  document.addEventListener("keydown",e=>{
+    if((e.key==="Enter"||e.key===" ")&&e.target.matches?.("[data-trace]")){e.preventDefault();e.target.click();}
+    if(e.key==="Escape"){const modal=document.getElementById("source-trace-modal");if(modal&&!modal.hidden){modal.hidden=true;document.body.style.overflow="";}}
+  });
 
   function renderAll(){
     renderOverview();
