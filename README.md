@@ -1,43 +1,65 @@
-# Alang-Alang Source Trace v21
+# Alang-Alang Compressed Health Tally v22
 
-Builds on v20.
+Builds on Source Trace v21.
 
 ## Replace
-- `diagnosis.html`
-- `diagnosis.js`
-- `diagnosis-analytics.css`
+- diagnosis.html
+- diagnosis.js
+- diagnosis-analytics.css
 
 ## No SQL needed
 
-## New: click-through source tracing
-Click supported bars/values in Community Diagnosis to see exactly which source survey records produced the count.
+## Added: Compressed Health Tally
+At the top of the Health tab, the dashboard now summarizes exactly:
 
-Supported examples include:
-- Sex Distribution, including `Unknown / not stated`
-- Population age groups and Population Pyramid bands
-- 0–23 months, 0–11 months, and 12–23 months
-- Reported illnesses and illness sex
-- Causes of death
-- family income, livelihood, water source/treatment, toilet type, garbage disposal
-- detailed categorical, binary, multi-select, text-frequency, and date questionnaire analytics
+1. Population 0–23 months
+   - 0–11 months
+   - 12–23 months
+   - total 0–23 months
 
-## Source panel
-The drill-down lists:
-- household code
-- zone
-- interview date
-- interviewer
-- encoder
-- matching member or repeater-row detail when available
+2. Morbidity
+   - ALL reported illness causes
+   - frequency and percent of illness records
 
-`View survey` opens the entire individual survey in a read-only panel inside Diagnosis.
+3. Mortality
+   - ALL reported causes of death
+   - frequency and percent of death records
 
-If the signed-in user owns the survey (or is an admin), an `Edit survey` button is also shown. It safely materializes the synced record to the device before opening `household-survey.html`.
+4. Interventions used during illness
+   - household-level frequency
+   - percent among households that answered
 
-## Privacy
-Direct identifiers are still excluded from aggregate graphs and exported images. They are only visible inside the authenticated source-survey drill-down for internal validation.
+5. Frequently availed health services
+   - household-level frequency
+   - percent among households that answered
 
-## Offline behavior
-Read-only source tracing works from the cached analytics dataset. Editing a synced-only survey may require reconnecting first.
+6. Preferred health worker
+   - household-level frequency
+   - percent among households that answered
 
-Every detailed questionnaire analytics card also has a **Sources** button, including numeric fields that do not have clickable histogram bins.
+## Source tracing retained
+Click any category/row to see the source household surveys.
+For ranking/text fields, the source panel also shows the raw response.
+
+## Free-text ranking cleanup
+The original survey used text areas for:
+- health_services_rank
+- health_worker_rank
+- health_interventions_rank
+
+v22 conservatively:
+- splits line/comma/semicolon/rank-separated entries
+- removes leading rank numbers
+- groups obvious aliases, e.g. RHU = Rural Health Unit; BHS = Barangay Health Station
+- does NOT modify the original survey data
+
+## CSV
+Use “Download CSV” in Compressed Health Tally to export a ready-to-tally table with:
+- Indicator
+- Category
+- Frequency
+- Denominator
+- Percent
+- Basis
+
+Note: multiple-response fields can total above 100%.

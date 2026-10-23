@@ -1369,6 +1369,224 @@ AAApp.context().then(async ctx=>{
     );
   }
 
+
+  const RANKED_FIELD_ALIASES={
+    services:new Map(Object.entries({
+      "rhu":"Rural Health Unit",
+      "rural health unit":"Rural Health Unit",
+      "bhs":"Barangay Health Station",
+      "barangay health station":"Barangay Health Station",
+      "public hospital":"Public Hospital",
+      "government hospital":"Public Hospital",
+      "private hospital":"Private Hospital",
+      "private clinic":"Private Clinic",
+      "clinic":"Private Clinic"
+    })),
+    workers:new Map(Object.entries({
+      "doctor":"Doctor / Physician",
+      "physician":"Doctor / Physician",
+      "md":"Doctor / Physician",
+      "nurse":"Nurse",
+      "midwife":"Midwife / RHM",
+      "rhm":"Midwife / RHM",
+      "rural health midwife":"Midwife / RHM",
+      "bhw":"Barangay Health Worker",
+      "barangay health worker":"Barangay Health Worker",
+      "albularyo":"Albularyo / Traditional Healer",
+      "medicine man":"Albularyo / Traditional Healer",
+      "traditional healer":"Albularyo / Traditional Healer"
+    })),
+    interventions:new Map(Object.entries({
+      "self medication":"Self-medication",
+      "self medicate":"Self-medication",
+      "self medicated":"Self-medication",
+      "albularyo":"Consulted Albularyo / Traditional Healer",
+      "medicine man":"Consulted Albularyo / Traditional Healer",
+      "traditional healer":"Consulted Albularyo / Traditional Healer",
+      "rhm":"Consulted RHM / Midwife",
+      "midwife":"Consulted RHM / Midwife",
+      "nurse":"Consulted Nurse",
+      "doctor":"Consulted Doctor / Physician",
+      "physician":"Consulted Doctor / Physician",
+      "hospital":"Went to Hospital",
+      "went to hospital":"Went to Hospital",
+      "immediately went to hospital":"Went to Hospital"
+    }))
+  };
+
+  function cleanRankedItem(value,kind){
+    let s=normalize(value);
+    if(!s)return "";
+    s=s.replace(/^(?:rank\s*)?#?\s*\d+\s*(?:st|nd|rd|th)?\s*[\.\)\-:–—]*\s*/i,"");
+    s=s.replace(/^[•\-–—]\s*/,"").trim();
+    if(!s)return "";
+    const key=basicCategoryKey(s);
+    const alias=RANKED_FIELD_ALIASES[kind]?.get(key);
+    return alias||prettyCategory(s);
+  }
+
+  function splitRankedText(raw,kind){
+    if(blank(raw))return [];
+    if(Array.isArray(raw)){
+      return raw.flatMap(v=>splitRankedText(v,kind));
+    }
+    let text=normalize(raw);
+    // Separate common inline ranking patterns such as "1 RHU 2 BHS 3 Public Hospital".
+    text=text.replace(/\s+(?=(?:#?\d+\s*[\.\)\-:–—]?\s*)[A-Za-z])/g," | ");
+    const parts=text.split(/\r?\n|;|\||,/).map(v=>cleanRankedItem(v,kind)).filter(Boolean);
+    const unique=[];
+    parts.forEach(v=>{
+      if(!unique.some(x=>sameCanonical(x,v)))unique.push(v);
+    });
+    return unique;
+  }
+
+  function rankedHouseholdTally(field,kind){
+    const groups=[];
+    let answeredHouseholds=0;
+    filteredRecords.forEach((record,recordIndex)=>{
+      const raw=record.response_json?.[field];
+      const items=splitRankedText(raw,kind);
+      if(!items.length)return;
+      answeredHouseholds++;
+      items.forEach(item=>{
+        const c=canonicalCategory(item);
+        let g=groups.find(x=>nearSameCategory(x.key,c.key));
+        if(!g){
+          g={key:c.key,label:item,count:0,variants:new Set()};
+          groups.push(g);
+        }
+        g.count++;
+        g.variants.add(normalize(raw));
+      });
+    });
+    return {
+      answeredHouseholds,
+      items:groups.map(g=>({label:g.label,count:g.count,variants:[...g.variants]}))
+        .sort((a,b)=>b.count-a.count||a.label.localeCompare(b.label))
+    };
+  }
+
+  function tallyTable(items,denom,traceBase,basisLabel){
+    if(!items.length)return '<div class="profile-empty">No recorded data.</div>';
+    return `<table class="tally-table">
+      <thead><tr><th>Category</th><th class="num">n</th><th class="num">%</th></tr></thead>
+      <tbody>${items.map(item=>{
+        const trace=makeTraceSpec(traceBase,item.label,{variants:item.variants||[]});
+        return `<tr class="${trace?"traceable-data":""}"${traceData(trace)}>
+          <td>${safe(item.label)}</td>
+          <td class="num">${item.count}</td>
+          <td class="num">${denom?pct(item.count,denom):0}%</td>
+        </tr>`;
+      }).join("")}
+      <tr class="tally-total-row"><td>${safe(basisLabel||"Denominator")}</td><td class="num">${denom}</td><td class="num">100%</td></tr>
+      </tbody>
+    </table>`;
+  }
+
+  function compressedHealthTallyData(){
+    const infant=infant023Stats();
+
+    const illnessRows=repeaterRows("illnesses");
+    const morbidity=counts(illnessRows.map(r=>r.illness).filter(v=>!blank(v)));
+
+    const deathRows=repeaterRows("deaths");
+    const mortality=counts(deathRows.map(r=>r.cause).filter(v=>!blank(v)));
+
+    const interventions=rankedHouseholdTally("health_interventions_rank","interventions");
+    const services=rankedHouseholdTally("health_services_rank","services");
+    const workers=rankedHouseholdTally("health_worker_rank","workers");
+
+    return {infant,illnessRows,morbidity,deathRows,mortality,interventions,services,workers};
+  }
+
+  function compressedHealthTally(){
+    const d=compressedHealthTallyData();
+
+    return `<section class="compressed-health-tally">
+      <div class="compressed-tally-head">
+        <div>
+          <h3>Compressed Health Tally</h3>
+          <p>Summary requested for consolidation across households. Click any category to trace it back to the source survey.</p>
+        </div>
+        <div class="compressed-tally-actions">
+          <button type="button" id="download-compressed-health-csv">↓ Download CSV</button>
+        </div>
+      </div>
+
+      <div class="compressed-tally-grid">
+        <article class="tally-card wide">
+          <h4>Population 0–23 Months</h4>
+          <p class="tally-basis">Canonical deduplicated population; birthdate + interview date preferred for exact month age.</p>
+          <table class="tally-table">
+            <thead><tr><th>Age group</th><th class="num">Population</th></tr></thead>
+            <tbody>
+              <tr class="traceable-data"${traceData({kind:"population-month-range",label:"Children 0–11 months",min:0,max:11})}><td>0–11 months</td><td class="num">${d.infant.infant011}</td></tr>
+              <tr class="traceable-data"${traceData({kind:"population-month-range",label:"Children 12–23 months",min:12,max:23})}><td>12–23 months</td><td class="num">${d.infant.child1223}</td></tr>
+              <tr class="tally-total-row traceable-data"${traceData({kind:"population-month-range",label:"Children 0–23 months",min:0,max:23})}><td>Total 0–23 months</td><td class="num">${d.infant.total}</td></tr>
+            </tbody>
+          </table>
+        </article>
+
+        <article class="tally-card">
+          <h4>Morbidity — All Reported Illnesses</h4>
+          <p class="tally-basis">Frequency is based on illness records, not unique households.</p>
+          ${tallyTable(d.morbidity,d.illnessRows.length,{kind:"repeater-field",path:"illnesses.illness",type:"categorical"},"Total illness records")}
+        </article>
+
+        <article class="tally-card">
+          <h4>Mortality — All Reported Causes</h4>
+          <p class="tally-basis">Frequency is based on recorded death/cause rows.</p>
+          ${tallyTable(d.mortality,d.deathRows.length,{kind:"repeater-field",path:"deaths.cause",type:"categorical"},"Total death records")}
+        </article>
+
+        <article class="tally-card">
+          <h4>Interventions Used During Illness</h4>
+          <p class="tally-basis">n = households mentioning the item; percentages use households that answered this field. Multiple responses are allowed, so percentages may total more than 100%.</p>
+          ${tallyTable(d.interventions.items,d.interventions.answeredHouseholds,{kind:"ranked-field-item",path:"health_interventions_rank",parseKind:"interventions"},"Households with response")}
+        </article>
+
+        <article class="tally-card">
+          <h4>Frequently Availed Health Services</h4>
+          <p class="tally-basis">n = households mentioning the service; percentages use households that answered this field. Multiple services may be listed.</p>
+          ${tallyTable(d.services.items,d.services.answeredHouseholds,{kind:"ranked-field-item",path:"health_services_rank",parseKind:"services"},"Households with response")}
+        </article>
+
+        <article class="tally-card wide">
+          <h4>Preferred Health Worker</h4>
+          <p class="tally-basis">n = households mentioning the health worker; percentages use households that answered this field. Multiple preferences may be listed.</p>
+          ${tallyTable(d.workers.items,d.workers.answeredHouseholds,{kind:"ranked-field-item",path:"health_worker_rank",parseKind:"workers"},"Households with response")}
+        </article>
+      </div>
+
+      <div class="tally-note"><strong>Important:</strong> The three ranking/text fields were originally entered as free text. This summary conservatively splits common comma-, semicolon-, line-, and rank-separated entries and groups obvious abbreviations such as RHU/Rural Health Unit and BHS/Barangay Health Station. Original survey responses are never changed.</div>
+    </section>`;
+  }
+
+  function exportCompressedHealthTally(){
+    const d=compressedHealthTallyData();
+    const rows=[["Indicator","Category","Frequency","Denominator","Percent","Basis"]];
+
+    rows.push(["Population 0–23 months","0–11 months",d.infant.infant011,d.infant.total,d.infant.total?pct(d.infant.infant011,d.infant.total):0,"Population"]);
+    rows.push(["Population 0–23 months","12–23 months",d.infant.child1223,d.infant.total,d.infant.total?pct(d.infant.child1223,d.infant.total):0,"Population"]);
+    rows.push(["Population 0–23 months","Total 0–23 months",d.infant.total,d.infant.total,100,"Population"]);
+
+    d.morbidity.forEach(x=>rows.push(["Morbidity",x.label,x.count,d.illnessRows.length,d.illnessRows.length?pct(x.count,d.illnessRows.length):0,"Illness records"]));
+    d.mortality.forEach(x=>rows.push(["Mortality",x.label,x.count,d.deathRows.length,d.deathRows.length?pct(x.count,d.deathRows.length):0,"Death records"]));
+    d.interventions.items.forEach(x=>rows.push(["Interventions used during illness",x.label,x.count,d.interventions.answeredHouseholds,d.interventions.answeredHouseholds?pct(x.count,d.interventions.answeredHouseholds):0,"Households with response"]));
+    d.services.items.forEach(x=>rows.push(["Frequently availed health services",x.label,x.count,d.services.answeredHouseholds,d.services.answeredHouseholds?pct(x.count,d.services.answeredHouseholds):0,"Households with response"]));
+    d.workers.items.forEach(x=>rows.push(["Preferred health worker",x.label,x.count,d.workers.answeredHouseholds,d.workers.answeredHouseholds?pct(x.count,d.workers.answeredHouseholds):0,"Households with response"]));
+
+    const csv="\uFEFF"+rows.map(r=>r.map(csvEscape).join(",")).join("\r\n");
+    const blob=new Blob([csv],{type:"text/csv;charset=utf-8"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");
+    a.href=url;
+    a.download=`alang-alang-compressed-health-tally-${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+  }
+
   function healthProfile(){
     const people=getPopulationProfiles();
     const pregnant=people.filter(p=>/^currently pregnant$/i.test(p.pregnancy_status)).length;
@@ -1397,7 +1615,7 @@ AAApp.context().then(async ctx=>{
       ${profileKpi("Death records",deathRows.length,"survey rows")}
     </div>`;
 
-    return `${kpis}<div class="profile-grid three">
+    return `${compressedHealthTally()}${kpis}<div class="profile-grid three">
       ${infant023Card()}
       ${yesNoMini("Exclusive Breastfeeding 6 Months",bf,{kind:"repeater-field",path:"breastfeeding.exclusive_6mo",type:"binary"})}
       ${yesNoMini("Supplementary Feeding",supp,{kind:"repeater-field",path:"supplementary_feeding.supplementary_feeding",type:"binary"})}
@@ -1521,6 +1739,21 @@ AAApp.context().then(async ctx=>{
     const matches=[];
     if(!spec)return matches;
 
+
+    if(spec.kind==="ranked-field-item"){
+      filteredRecords.forEach((record,recordIndex)=>{
+        const raw=record.response_json?.[spec.path];
+        const items=splitRankedText(raw,spec.parseKind);
+        if(items.some(item=>sameCanonical(item,spec.value))){
+          matches.push({
+            record,recordIndex,
+            detail:{field:spec.path,value:raw,parsedItem:spec.value}
+          });
+        }
+      });
+      return matches;
+    }
+
     if(spec.kind==="field"){
       filteredRecords.forEach((record,recordIndex)=>{
         const raw=record.response_json?.[spec.path];
@@ -1591,6 +1824,7 @@ AAApp.context().then(async ctx=>{
       if(!bits.length)bits.push(`${humanize(d.field||"Match")}: ${normalize(d.value)}`);
       return bits.join(" · ");
     }
+    if(d.parsedItem)return `${fieldLabel(d.field)} → ${d.parsedItem} · Raw response: ${Array.isArray(d.value)?d.value.join(" | "):normalize(d.value)}`;
     return d.field?`${fieldLabel(d.field)}: ${Array.isArray(d.value)?d.value.join(" | "):normalize(d.value)}`:"";
   }
 
@@ -1603,6 +1837,7 @@ AAApp.context().then(async ctx=>{
     if(spec.kind==="population-age")return `Age group: ${spec.value}`;
     if(spec.kind==="population-age-sex")return `${spec.sex}, age ${spec.value}`;
     if(spec.kind==="population-field")return `${humanize(spec.field)}: ${spec.value}`;
+    if(spec.kind==="ranked-field-item")return `${fieldLabel(spec.path)}: ${spec.value}`;
     if(spec.path)return `${fieldLabel(spec.path)}${spec.value!==undefined?`: ${spec.value}`:""}`;
     return spec.value||"Selected data";
   }
@@ -1681,6 +1916,7 @@ AAApp.context().then(async ctx=>{
 
   let lastTraceSpec=null;
   document.addEventListener("click",e=>{
+    if(e.target.closest("#download-compressed-health-csv")){exportCompressedHealthTally();return;}
     const trace=e.target.closest("[data-trace]");
     if(trace&&!trace.closest("#source-trace-modal")){
       try{lastTraceSpec=JSON.parse(decodeURIComponent(trace.dataset.trace));showTraceSources(lastTraceSpec);}catch(err){console.error(err);}

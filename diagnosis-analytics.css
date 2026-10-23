@@ -320,3 +320,99 @@
 .question-card-tools{display:flex;align-items:center;gap:5px;flex-wrap:wrap;justify-content:flex-end}
 .source-inline-button{border:1px solid #ddd;background:#fff;border-radius:6px;padding:3px 6px;font-size:6px;font-weight:800;color:var(--maroon);cursor:pointer}
 @media print{.source-inline-button{display:none!important}}
+
+
+/* v22 — compressed health tally requested for paper */
+.compressed-health-tally{
+  margin:8px 0 12px;
+  padding:10px;
+  border:1px solid #d9d2ca;
+  border-radius:12px;
+  background:#fff;
+}
+.compressed-tally-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:10px;
+  margin-bottom:8px;
+}
+.compressed-tally-head h3{
+  margin:0;
+  font:700 13px "Times New Roman",Times,serif;
+  color:#111;
+}
+.compressed-tally-head p{
+  margin:3px 0 0;
+  font:400 7.5px/1.4 "Times New Roman",Times,serif;
+  color:#555;
+}
+.compressed-tally-actions{
+  display:flex;
+  gap:6px;
+  flex-wrap:wrap;
+}
+.compressed-tally-actions button{
+  border:1px solid #cfc6bc;
+  background:#fff;
+  border-radius:7px;
+  padding:6px 8px;
+  cursor:pointer;
+  font:700 7px "Times New Roman",Times,serif;
+}
+.compressed-tally-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:8px;
+}
+.tally-card{
+  border:1px solid #ddd;
+  background:#fff;
+  padding:8px;
+  border-radius:9px;
+}
+.tally-card.wide{grid-column:1/-1}
+.tally-card h4{
+  margin:0 0 5px;
+  font:700 10px "Times New Roman",Times,serif;
+  color:#111;
+}
+.tally-basis{
+  margin:0 0 6px;
+  color:#666;
+  font:400 6.5px/1.35 "Times New Roman",Times,serif;
+}
+.tally-table{
+  width:100%;
+  border-collapse:collapse;
+  font:400 7.5px "Times New Roman",Times,serif;
+}
+.tally-table th,.tally-table td{
+  border:1px solid #d5d5d5;
+  padding:5px 6px;
+  vertical-align:top;
+}
+.tally-table th{
+  background:#f3f3f3;
+  font-weight:700;
+  text-align:left;
+}
+.tally-table td.num,.tally-table th.num{text-align:right}
+.tally-table tbody tr.traceable-data{cursor:pointer}
+.tally-table tbody tr.traceable-data:hover{background:#faf6f0}
+.tally-total-row{font-weight:700;background:#fafafa}
+.tally-note{
+  margin-top:8px;
+  padding:7px 8px;
+  border-left:2px solid #777;
+  background:#fafafa;
+  font:400 7px/1.4 "Times New Roman",Times,serif;
+  color:#444;
+}
+@media(max-width:760px){
+  .compressed-tally-grid{grid-template-columns:1fr}
+  .compressed-tally-head{flex-direction:column}
+}
+@media print{
+  .compressed-tally-actions{display:none!important}
+}
